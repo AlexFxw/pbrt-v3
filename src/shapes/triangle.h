@@ -47,6 +47,12 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Triangle meshes", triMeshBytes);
 
+struct PolyStorage {
+    float coeffs[3][20];
+    float kernelEps[3];
+    size_t nPolyCoeffs = 20;
+};
+
 // Triangle Declarations
 struct TriangleMesh {
     // TriangleMesh Public Methods
@@ -56,7 +62,7 @@ struct TriangleMesh {
                  const std::shared_ptr<Texture<Float>> &alphaMask,
                  const std::shared_ptr<Texture<Float>> &shadowAlphaMask,
                  const int *faceIndices);
-
+    ~TriangleMesh();
     // TriangleMesh Data
     const int nTriangles, nVertices;
     std::vector<int> vertexIndices;
@@ -65,20 +71,29 @@ struct TriangleMesh {
     std::unique_ptr<Vector3f[]> s;
     std::unique_ptr<Point2f[]> uv;
     std::shared_ptr<Texture<Float>> alphaMask, shadowAlphaMask;
+    PolyStorage *poly;
     std::vector<int> faceIndices;
+
+    inline bool HasPolyCoeffs() const { return poly != nullptr; }
+
+    void CreatePolyCoeffs() { poly = new PolyStorage[nVertices]; }
+
+    PolyStorage* GetPolyeffs() const { return poly;}
+
 };
 
 class Triangle : public Shape {
-  public:
+public:
     // Triangle Public Methods
     Triangle(const Transform *ObjectToWorld, const Transform *WorldToObject,
              bool reverseOrientation, const std::shared_ptr<TriangleMesh> &mesh,
              int triNumber)
-        : Shape(ObjectToWorld, WorldToObject, reverseOrientation), mesh(mesh) {
+            : Shape(ObjectToWorld, WorldToObject, reverseOrientation), mesh(mesh) {
         v = &mesh->vertexIndices[3 * triNumber];
         triMeshBytes += sizeof(*this);
         faceIndex = mesh->faceIndices.size() ? mesh->faceIndices[triNumber] : 0;
     }
+
     Bounds3f ObjectBound() const;
     Bounds3f WorldBound() const;
     bool Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
@@ -93,7 +108,7 @@ class Triangle : public Shape {
     // reference point p.
     Float SolidAngle(const Point3f &p, int nSamples = 0) const;
 
-  private:
+private:
     // Triangle Private Methods
     void GetUVs(Point2f uv[3]) const {
         if (mesh->uv) {
@@ -114,16 +129,16 @@ class Triangle : public Shape {
 };
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
-    int nTriangles, const int *vertexIndices, int nVertices, const Point3f *p,
-    const Vector3f *s, const Normal3f *n, const Point2f *uv,
-    const std::shared_ptr<Texture<Float>> &alphaTexture,
-    const std::shared_ptr<Texture<Float>> &shadowAlphaTexture,
-    const int *faceIndices = nullptr);
+        const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+        int nTriangles, const int *vertexIndices, int nVertices, const Point3f *p,
+        const Vector3f *s, const Normal3f *n, const Point2f *uv,
+        const std::shared_ptr<Texture<Float>> &alphaTexture,
+        const std::shared_ptr<Texture<Float>> &shadowAlphaTexture,
+        const int *faceIndices = nullptr);
 std::vector<std::shared_ptr<Shape>> CreateTriangleMeshShape(
-    const Transform *o2w, const Transform *w2o, bool reverseOrientation,
-    const ParamSet &params,
-    std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures =
+        const Transform *o2w, const Transform *w2o, bool reverseOrientation,
+        const ParamSet &params,
+        std::map<std::string, std::shared_ptr<Texture<Float>>> *floatTextures =
         nullptr);
 
 bool WritePlyFile(const std::string &filename, int nTriangles,

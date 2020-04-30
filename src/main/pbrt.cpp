@@ -68,6 +68,10 @@ Reformatting options:
   --toply              Print a reformatted version of the input file(s) to
                        standard output and convert all triangle meshes to
                        PLY files. Does not render an image.
+
+Generating train data options:
+  --generate <dir>     Generating the medium unbiased sampled result to the files
+                       Used for shape-adaptive subsurface scattering.
 )");
     exit(msg ? 1 : 0);
 }
@@ -134,6 +138,8 @@ int main(int argc, char *argv[]) {
                    !strcmp(argv[i], "-h")) {
             usage();
             return 0;
+        } else if (!strncmp(argv[i], "--generate=", 11)) {
+
         } else
             filenames.push_back(argv[i]);
     }

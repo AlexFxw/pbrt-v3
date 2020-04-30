@@ -71,6 +71,17 @@ inline Float PhaseHG(Float cosTheta, Float g) {
     return Inv4Pi * (1 - g * g) / (denom * std::sqrt(denom));
 }
 
+struct MediumParameters {
+    Spectrum albedo;
+    Spectrum sigmaT;
+    Float g;
+    Float eta;
+    MediumParameters() {}
+    MediumParameters(const Spectrum &albedo, Float g, Float eta, const Spectrum &sigmaT)
+            : albedo(albedo), sigmaT(sigmaT), g(g), eta(eta) {}
+    inline bool isRgb() const { return (sigmaT.min() != sigmaT.max()) || (albedo.min() != albedo.max()); }
+};
+
 // Medium Declarations
 class Medium {
   public:

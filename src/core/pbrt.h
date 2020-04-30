@@ -143,6 +143,7 @@ class Material;
 template <typename T>
 class Texture;
 class Medium;
+struct MediumParameters;
 class MediumInteraction;
 struct MediumInterface;
 class BSSRDF;
@@ -180,6 +181,7 @@ struct Options {
     bool quiet = false;
     bool cat = false, toPly = false;
     std::string imageFile;
+    std::string traindataFile; // Only used for shape-adaptive training data.
     // x0, x1, y0, y1
     Float cropWindow[2][2];
 };
@@ -485,6 +487,58 @@ inline Float Erf(Float x) {
         (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * std::exp(-x * x);
 
     return sign * y;
+}
+
+inline Float effectiveAlbedo(const Float &albedo) {
+    return -std::log(1.0f - albedo * (1.0f - std::exp(-8.0f))) / 8.0f;
+}
+
+/**
+ * Apply an arbitrary permutation to an array in linear time
+ *
+ * This algorithm is based on Donald Knuth's book
+ * "The Art of Computer Programming, Volume 3: Sorting and Searching"
+ * (1st edition, section 5.2, page 595)
+ *
+ * Given a permutation and an array of values, it applies the permutation
+ * in linear time without requiring additional memory. This is based on
+ * the fact that each permutation can be decomposed into a disjoint set
+ * of permutations, which can then be applied individually.
+ *
+ * \param data
+ *     Pointer to the data that should be permuted
+ * \param perm
+ *     Input permutation vector having the same size as \c data. After
+ *     the function terminates, this vector will be set to the
+ *     identity permutation.
+ */
+template <typename DataType, typename IndexType> void permute_inplace(
+        DataType *data, std::vector<IndexType> &perm) {
+    for (size_t i=0; i<perm.size(); i++) {
+        if (perm[i] != i) {
+            /* The start of a new cycle has been found. Save
+               the value at this position, since it will be
+               overwritten */
+            IndexType j = (IndexType) i;
+            DataType curval = data[i];
+
+            do {
+                /* Shuffle backwards */
+                IndexType k = perm[j];
+                data[j] = data[k];
+
+                /* Also fix the permutations on the way */
+                perm[j] = j;
+                j = k;
+
+                /* Until the end of the cycle has been found */
+            } while (perm[j] != i);
+
+            /* Fix the final position with the saved value */
+            data[j] = curval;
+            perm[j] = j;
+        }
+    }
 }
 
 }  // namespace pbrt

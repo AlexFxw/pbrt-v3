@@ -59,6 +59,7 @@ endif()
 
 FIND_PACKAGE ( Sanitizers )
 FIND_PACKAGE ( Threads )
+FIND_PACKAGE ( Eigen3 3.3 REQUIRED NO_MODULE)
 
 IF(CMAKE_BUILD_TYPE MATCHES RELEASE)
   ADD_DEFINITIONS (-DNDEBUG)
@@ -364,6 +365,14 @@ SET_PROPERTY(TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLD
 INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 
 ###########################################################################
+# tensorflow 
+
+INCLUDE_DIRECTORIES ( src/ext/tensorflow/include )
+FILE ( GLOB TF_LIB
+  src/ext/tensorflow/lib/*.dylib
+)
+
+###########################################################################
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
@@ -543,6 +552,9 @@ ADD_SANITIZERS ( obj2pbrt )
 
 ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
+
+ADD_EXECUTABLE ( tf_utils train_utils/generator.cpp )
+TARGET_LINK_LIBRARIES ( tf_utils ${TF_LIB})
 
 # Unit test
 

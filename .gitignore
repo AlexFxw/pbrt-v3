@@ -3,3 +3,11 @@ src/build
 src/bin
 src/objs
 .sconsign.dblite
+build
+.idea
+cmake-build-debug
+.vscode
+src/materials/subsurface/variables
+src/ext/tensorflow
+*.exr
+*.DS_Store

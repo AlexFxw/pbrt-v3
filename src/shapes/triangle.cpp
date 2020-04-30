@@ -89,6 +89,13 @@ TriangleMesh::TriangleMesh(
 
     if (fIndices)
         faceIndices = std::vector<int>(fIndices, fIndices + nTriangles);
+
+    poly = nullptr;
+}
+
+TriangleMesh::~TriangleMesh() {
+    if(poly)
+        delete []poly;
 }
 
 std::vector<std::shared_ptr<Shape>> CreateTriangleMesh(

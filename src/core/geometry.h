@@ -784,6 +784,15 @@ class Bounds3 {
         Vector3<T> d = Diagonal();
         return d.x * d.y * d.z;
     }
+    int LargestAxis() const {
+        Vector3<T> d = Diagonal();
+        int largest = 0;
+        for(int i = 1; i < 3; i ++) {
+            if(d[i] > d[largest])
+                largest = i;
+        }
+        return largest;
+    }
     int MaximumExtent() const {
         Vector3<T> d = Diagonal();
         if (d.x > d.y && d.x > d.z)
