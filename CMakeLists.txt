@@ -466,6 +466,7 @@ FILE ( GLOB PBRT_SOURCE
   src/integrators/*
   src/lights/*
   src/materials/*
+  src/materials/subsurface/*
   src/samplers/*
   src/shapes/*
   src/textures/*
@@ -474,6 +475,7 @@ FILE ( GLOB PBRT_SOURCE
 
 INCLUDE_DIRECTORIES ( src )
 INCLUDE_DIRECTORIES ( src/core )
+INCLUDE_DIRECTORIES ( src/ext )
 
 # Visual Studio source folders
 SOURCE_GROUP (core REGULAR_EXPRESSION src/core/.*)

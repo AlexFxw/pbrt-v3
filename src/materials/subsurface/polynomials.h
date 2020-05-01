@@ -6,6 +6,8 @@
 #define PBRT_V3_POLYNOMIALS_H
 
 #include "pbrt.h"
+#include "geometry.h"
+#include <Eigen/Core>
 
 namespace pbrt {
 
@@ -44,7 +46,8 @@ struct SimpleKDNode {
         if (value)
             flags |= (uint8_t) ELeafFlag;
         else
-            flags &= (uint8_t) ~ELeafFlag;
+            flags &= (uint8_t)
+                    ~ELeafFlag;
     }
 
 
@@ -53,7 +56,10 @@ struct SimpleKDNode {
     // Get the split axis of this node.
     uint16_t GetAxis() const { return flags & (uint8_t) EAxisMask; }
 
-    void SetAxis(uint8_t axis) { flags = (flags & (uint8_t) ~EAxisMask) | axis; }
+    void SetAxis(uint8_t axis) {
+        flags = (flags & (uint8_t)
+                ~EAxisMask) | axis;
+    }
 };
 
 template<typename NodeType>
@@ -212,24 +218,64 @@ public:
 
     struct PolyFitRecord {
         PolyFitConfig config;
-        Point p;
-        Vector d;
-        Vector n;
+        Point3f p;
+        Vector3f d;
+        Normal3f n;
         MediumParameters medium;
         float kernelEps;
     };
 
+    struct Frame {
+        Vector3f s, t;
+        Normal3f n;
+
+        Frame() {}
+
+        Frame(const Vector3f &s, const Vector3f &t, const Normal3f &n) : s(s), t(t), n(n) {}
+
+        inline Vector3f toLocal(const Vector3f &v) const {
+            return Vector3f(
+                    pbrt::Dot(v, s),
+                    pbrt::Dot(v, t),
+                    pbrt::Dot(v, n)
+            );
+        }
+
+        /// Convert from local coordinates to world coordinates
+        inline Vector3f toWorld(const Vector3f &v) const {
+            return s * v.x + t * v.y + n * v.z;
+        }
+    };
+
     struct Polynomial {
         std::vector<float> coeffs;
-        Point refPos;
-        Vector refDir;
+        Point3f refPos;
+        Vector3f refDir;
         bool useLocalDir;
         float scaleFactor;
         int order;
         std::vector<float> normalHistogram;
     };
 
-    Float GetKernelEps(const MediumParameters &mediumParas, int channel, Float kernalMultiplier);
+    static PBRT_CONSTEXPR size_t powerToIndex(size_t dx, size_t dy, size_t dz) {
+        // Converts a polynomial degree to a linear coefficient index
+        auto d = dx + dy + dz;
+        auto i = d - dx;
+        auto j = d - dx - dy;
+        return i * (i + 1) / 2 + j + d * (d + 1) * (d + 2) / 6;
+    }
+
+    static Float GetKernelEps(const MediumParameters &mediumParas, int channel, Float kernelMultiplier);
+
+    static inline float GetFitScaleFactor(float kernelEps) { return 1.0f / std::sqrt(kernelEps); }
+
+    static PBRT_CONSTEXPR int nChooseK(int n, int k) {
+        return (k == 0 || n == k) ? 1 : nChooseK(n - 1, k - 1) + nChooseK(n - 1, k);
+    }
+
+    static PBRT_CONSTEXPR int nPolyCoeffs(int polyOrder, bool hardSurfaceConstraint = false) {
+        return hardSurfaceConstraint ? nChooseK(3 + polyOrder, polyOrder) - 1 : nChooseK(3 + polyOrder, polyOrder);
+    }
 
     static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
     FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree);
@@ -238,10 +284,33 @@ public:
     static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
     FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree);
 
+    static void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
+        float sign = copysignf(1.0f, n.z);
+        const float a = -1.0f / (sign + n.z);
+        const float b = n.x * n.y * a;
+        b1 = Vector3f(1.0f + sign * n.x * n.x * a, sign * b, -sign * n.x);
+        b2 = Vector3f(b, sign + n.y * n.y * a, -n.y);
+    }
+
+    template<int order, typename T>
+    static Eigen::Matrix<float, nPolyCoeffs(order), 1> RotatePolynomialEigen(const T &c,
+                                                                             const Vector3f &s, const Vector3f &t,
+                                                                             const Normal3f &n);
+    static void ProjectPointsToSurface(const Scene *scene,
+                                       const Point3f &refPoint, const Vector3f &refDir,
+                                       ScatterSamplingRecord &rec,
+                                       const Eigen::VectorXf &polyCoefficients,
+                                       size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps);
+
 protected:
     static inline Float GaussianKernel(Float dist2, Float sigma2) {
         return std::exp(-dist2 / (2 * sigma2));
     }
+
+    static Vector3f EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, const ScatterSamplingRecord &rec,
+                                     size_t degree, Float scaleFactor, bool useLocalDir, const Vector3f &refDir);
+
+
 };
 
 }

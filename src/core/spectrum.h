@@ -278,6 +278,14 @@ class CoefficientSpectrum {
         return c[i];
     }
 
+    inline Float Average() const {
+        Float res = 0.0f;
+        for (int i = 0; i < nSpectrumSamples; ++i) {
+            res += c[i];
+        }
+        return nSpectrumSamples > 0 ? res / (Float)nSpectrumSamples : 0.0f;
+    }
+
     // CoefficientSpectrum Public Data
     static const int nSamples = nSpectrumSamples;
 

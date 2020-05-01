@@ -49,6 +49,16 @@ namespace pbrt {
 Float FresnelMoment1(Float invEta);
 Float FresnelMoment2(Float invEta);
 
+// The struct is used for recording sampled scatter info
+struct ScatterSamplingRecord {
+    Point3f p;
+    Vector3f w;
+    Normal3f n;
+    bool isValid;
+    Spectrum throughout;
+    int sampledChannel = - 1;
+};
+
 // BSSRDF Declarations
 class BSSRDF {
   public:

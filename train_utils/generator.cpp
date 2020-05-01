@@ -12,5 +12,6 @@
 int main(int argc, char *argv[])
 {
     printf("Hello from TensorFlow C library %s\n", TF_Version());
+
     return 0;
 }

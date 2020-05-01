@@ -39,6 +39,7 @@
 #define PBRT_CORE_INTERACTION_H
 
 // core/interaction.h*
+#include <shapes/triangle.h>
 #include "pbrt.h"
 #include "geometry.h"
 #include "transform.h"
@@ -91,12 +92,20 @@ struct Interaction {
         return mediumInterface.inside;
     }
 
+    const float* GetPolyCoeffs() const {
+        if(polyStorage != nullptr) {
+            return polyStorage->coeffs;
+        }
+        return nullptr;
+    }
+
     // Interaction Public Data
     Point3f p;
     Float time;
     Vector3f pError;
     Vector3f wo;
     Normal3f n;
+    PolyStorage *polyStorage = nullptr;
     MediumInterface mediumInterface;
 };
 
