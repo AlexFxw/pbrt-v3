@@ -6,12 +6,7 @@
  * @Description: Generating the train data.
  */
 
-#include <stdio.h>
-#include <tensorflow/c/c_api.h>
-
 int main(int argc, char *argv[])
 {
-    printf("Hello from TensorFlow C library %s\n", TF_Version());
-
     return 0;
 }

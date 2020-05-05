@@ -120,7 +120,7 @@ public:
     virtual std::pair<Eigen::Vector3f, float>
     Run(const Eigen::Vector3f &inPos, const Eigen::Vector3f &inDir, const Spectrum &albedo, float g, float ior,
         const Spectrum &sigmaT, float polyScaleFactor,
-        const Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(3), 1> &polyCoeffs, Sampler *sampler,
+        const Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(3), 1> &polyCoeffs, Sampler &sampler,
         const Transform &toAsTransform) const = 0;
 
     virtual ~ScatterModelBase() {}
@@ -185,7 +185,7 @@ public:
         const Spectrum &sigmaT,
         const float polyScaleFactor,
         const Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(PolyOrder), 1> &polyCoeffs,
-        Sampler *sampler, const Transform &toAsTransform) const override {
+        Sampler &sampler, const Transform &toAsTransform) const override {
         Eigen::Matrix<float, NetworkUtils::nInFeatures(PolyOrder), 1> x =
                 NetworkUtils::PreprocessFeatures<PolyOrder, false>(albedo, g, ior, sigmaT, polyCoeffs, m_albedoMean,
                                                                    m_albedoStdInv,

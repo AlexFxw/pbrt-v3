@@ -15,25 +15,43 @@ int VaeHandlerEigen::Prepare(const pbrt::Scene *scene, const std::vector<Shape *
                              const std::string &absModelName, const std::string &angularModelName,
                              const std::string &outputDir, int batchSize,
                              const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
-    // TODO: Load the scatter model.
+    std::string modelPath = outputDir + "models/" + modelName + "/";
+    std::string absModelPath = outputDir + "models_abs/" + absModelName + "/";
+    std::string angularModelPath = outputDir + "models_angular/" + angularModelName + "/";
+    std::string graph_path = modelPath + "frozen_model.pb";
+    std::string abs_graph_path = absModelPath + "frozen_model.pb";
+    std::string angular_graph_path = angularModelPath + "frozen_model.pb";
+    std::string configFile = modelPath + "training-metadata.json";
+    std::string angularConfigFile = angularModelPath + "training-metadata.json";
+
+    std::string absVariableDir = absModelPath + "/variables/";
+    std::string scatterVariableDir = modelPath + "/variables/";
+
+    scatterModel = std::unique_ptr<ScatterModelBase>(new ScatterModel<3, 8>(
+            scatterVariableDir, absVariableDir, mConfig.stats, "mlsPolyLS3"
+    ));
+
+    mEffectiveAlbedo = pbrt::EffectiveAlbedo(albedo);
+    LOG(INFO) << "Finish loading VAE model.";
+    return 0;
 }
 
-ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &pi, const Vector3f &wi, Point3f *po, Vector3f *wo,
-                            const Scene *scene, const Vector3f &polyNormal, const Spectrum &sigmaT,
-                            const Spectrum &albedo, float g, float eta, Sampler *sampler, const Interaction *isect,
-                            bool projectSamples, int channel) const {
+ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f &wo,
+                                              const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
+                                              const Spectrum &albedo, float g, float eta, Sampler &sampler,
+                                              const Interaction &isect, bool projectSamples, int channel) const {
     AbsorptionModel<3>::ShapeVector shapeCoeffEigen;
     AbsorptionModel<3>::ShapeVector shapeCoeffEigenWs;
     Transform asTransform;
 
     // TODO: prediction scope
-    const float *coeffs = isect->GetPolyCoeffs()[channel];
+    const float *coeffs = isect.GetPolyCoeffs()[channel];
     for (int i = 0; i < shapeCoeffEigenWs.size(); i++) {
         shapeCoeffEigenWs[i] = coeffs[i];
     }
-    std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(pi, wi, polyNormal, isect, channel);
-    const Eigen::Vector3f inPos(pi.x, pi.y, pi.z);
-    const Eigen::Vector3f inDir(wi.x, wi.y, wi.z);
+    std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
+    const Eigen::Vector3f inPos(po.x, po.y, po.z);
+    const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
 
     Spectrum albedoChannel(albedo[channel]);
     Spectrum sigmaTChannel(sigmaT[channel]);
@@ -52,8 +70,14 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &pi, const Vector3f 
     sRec.w = Vector3f(); // FIXME
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
     sRec.isValid = absorption < 1.0f;
-    PolyUtils::ProjectPointsToSurface(scene, pi, -wi, sRec, shapeCoeffEigen, mConfig.polyOrder, false, fitScaleFactor, kernelEps);
+    PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
+                                      mConfig.polyOrder, false, fitScaleFactor, kernelEps);
     return sRec;
 }
+
+VaeHandlerEigen::VaeHandlerEigen(Float kernelEpsScale) {
+    mKernelEpsScale = kernelEpsScale;
+}
+
 
 }

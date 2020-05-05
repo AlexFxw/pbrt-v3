@@ -518,6 +518,15 @@ void ResampleLinearSpectrum(const Float *lambdaIn, const Float *vIn, int nIn,
                             Float lambdaMin, Float lambdaMax, int nOut,
                             Float *vOut);
 
+inline RGBSpectrum EffectiveAlbedo(const Spectrum &albedo) {
+    float r = pbrt::EffectiveAlbedo(albedo[0]);
+    float g = pbrt::EffectiveAlbedo(albedo[1]);
+    float b = pbrt::EffectiveAlbedo(albedo[2]);
+    Float rgb[3] = {r, g, b};
+    RGBSpectrum res = RGBSpectrum::FromRGB(rgb);
+    return res;
+}
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_SPECTRUM_H

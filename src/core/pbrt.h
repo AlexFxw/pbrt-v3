@@ -565,7 +565,7 @@ inline Float Erf(Float x) {
     return sign * y;
 }
 
-inline Float effectiveAlbedo(const Float &albedo) {
+inline Float EffectiveAlbedo(const Float &albedo) {
     return -std::log(1.0f - albedo * (1.0f - std::exp(-8.0f))) / 8.0f;
 }
 

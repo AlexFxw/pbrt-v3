@@ -73,13 +73,21 @@ struct TriangleMesh {
     std::shared_ptr<Texture<Float>> alphaMask, shadowAlphaMask;
     PolyStorage *poly;
     std::vector<int> faceIndices;
+    Distribution1D *areaDistri = nullptr;
+    Float area = 0.0f, invArea = 0.0f;
 
     inline bool HasPolyCoeffs() const { return poly != nullptr; }
 
     void CreatePolyCoeffs() { poly = new PolyStorage[nVertices]; }
 
-    PolyStorage* GetPolyeffs() const { return poly;}
+    PolyStorage *GetPolyeffs() const { return poly; }
 
+    Float Area() const {
+        DCHECK_GT(area, 0.0f);
+        DCHECK_GT(invArea, 0.0f);
+        DCHECK_EQ(invArea, 1.0f / area);
+        return area;
+    }
 };
 
 class Triangle : public Shape {
@@ -108,6 +116,8 @@ public:
     // reference point p.
     Float SolidAngle(const Point3f &p, int nSamples = 0) const;
 
+    friend class VaeHandler;
+
 private:
     // Triangle Private Methods
     void GetUVs(Point2f uv[3]) const {
@@ -120,6 +130,15 @@ private:
             uv[1] = Point2f(1, 0);
             uv[2] = Point2f(1, 1);
         }
+    }
+
+    int GetPolyStorage(PolyStorage poly[3]) const {
+        if (mesh->poly)
+            for (int i = 0; i < 3; i++)
+                poly[i] = mesh->poly[v[i]];
+        else
+            return 1;
+        return 0;
     }
 
     // Triangle Private Data

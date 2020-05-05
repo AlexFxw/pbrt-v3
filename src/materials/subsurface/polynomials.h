@@ -269,6 +269,12 @@ public:
 
     static inline float GetFitScaleFactor(float kernelEps) { return 1.0f / std::sqrt(kernelEps); }
 
+    static inline float
+    GetFitScaleFactor(const MediumParameters &medium, int channel = 0, Float kernel_multiplier = 1.0f) {
+        return GetFitScaleFactor(GetKernelEps(medium, channel, kernel_multiplier));
+    }
+
+
     static PBRT_CONSTEXPR int nChooseK(int n, int k) {
         return (k == 0 || n == k) ? 1 : nChooseK(n - 1, k - 1) + nChooseK(n - 1, k);
     }
@@ -296,19 +302,21 @@ public:
     static Eigen::Matrix<float, nPolyCoeffs(order), 1> RotatePolynomialEigen(const T &c,
                                                                              const Vector3f &s, const Vector3f &t,
                                                                              const Normal3f &n);
-    static void ProjectPointsToSurface(const Scene *scene,
-                                       const Point3f &refPoint, const Vector3f &refDir,
-                                       ScatterSamplingRecord &rec,
-                                       const Eigen::VectorXf &polyCoefficients,
+    static void ProjectPointsToSurface(const Scene *scene, const Point3f &refPoint, const Vector3f &refDir,
+                                       ScatterSamplingRecord &rec, const Eigen::VectorXf &polyCoefficients,
                                        size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps);
+
+    static Normal3f AdjustRayDirForPolynomialTracing(Vector3f &inDir, const SurfaceInteraction &isect,
+                                                     int polyOrder, Float polyScaleFactor, int channel);
 
 protected:
     static inline Float GaussianKernel(Float dist2, Float sigma2) {
         return std::exp(-dist2 / (2 * sigma2));
     }
 
-    static Vector3f EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, const ScatterSamplingRecord &rec,
-                                     size_t degree, Float scaleFactor, bool useLocalDir, const Vector3f &refDir);
+    static Vector3f
+    EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, const ScatterSamplingRecord &rec,
+                     size_t degree, Float scaleFactor, bool useLocalDir, const Vector3f &refDir);
 
 
 };

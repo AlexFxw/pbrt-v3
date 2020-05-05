@@ -48,7 +48,7 @@ namespace pbrt {
 
 // SubsurfaceMaterial Declarations
 class SubsurfaceMaterial : public Material {
-  public:
+public:
     // SubsurfaceMaterial Public Methods
     SubsurfaceMaterial(Float scale,
                        const std::shared_ptr<Texture<Spectrum>> &Kr,
@@ -60,24 +60,25 @@ class SubsurfaceMaterial : public Material {
                        const std::shared_ptr<Texture<Float>> &vRoughness,
                        const std::shared_ptr<Texture<Float>> &bumpMap,
                        bool remapRoughness)
-        : scale(scale),
-          Kr(Kr),
-          Kt(Kt),
-          sigma_a(sigma_a),
-          sigma_s(sigma_s),
-          uRoughness(uRoughness),
-          vRoughness(vRoughness),
-          bumpMap(bumpMap),
-          eta(eta),
-          remapRoughness(remapRoughness),
-          table(100, 64) {
+            : scale(scale),
+              Kr(Kr),
+              Kt(Kt),
+              sigma_a(sigma_a),
+              sigma_s(sigma_s),
+              uRoughness(uRoughness),
+              vRoughness(vRoughness),
+              bumpMap(bumpMap),
+              eta(eta),
+              remapRoughness(remapRoughness),
+              table(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
+
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
                                     TransportMode mode,
                                     bool allowMultipleLobes) const;
 
-  private:
+protected:
     // SubsurfaceMaterial Private Data
     const Float scale;
     std::shared_ptr<Texture<Spectrum>> Kr, Kt, sigma_a, sigma_s;
@@ -85,6 +86,8 @@ class SubsurfaceMaterial : public Material {
     std::shared_ptr<Texture<Float>> bumpMap;
     const Float eta;
     const bool remapRoughness;
+
+private:
     BSSRDFTable table;
 };
 

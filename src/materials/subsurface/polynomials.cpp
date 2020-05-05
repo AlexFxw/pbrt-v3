@@ -516,4 +516,26 @@ PolyUtils::EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, c
     return pbrt::Vector3f();
 }
 
+Normal3f PolyUtils::AdjustRayDirForPolynomialTracing(Vector3f &inDir, const SurfaceInteraction &isect, int polyOrder,
+                                                     Float polyScaleFactor, int channel) {
+    const int *pX = DerivPermutation(polyOrder, 0);
+    const int *pY = DerivPermutation(polyOrder, 1);
+    const int *pZ = DerivPermutation(polyOrder, 2);
+
+    float polyValue;
+    Vector3f polyNormal;
+    std::tie(polyValue, polyNormal) = EvalPolyGrad(isect.p, isect.p, polyOrder, pX, pY, pZ,
+                                                   polyScaleFactor, false,
+                                                   inDir, isect.polyStorage->coeffs[channel]);
+    Vector3f rotationAxis = pbrt::Cross(isect.shading.n, polyNormal);
+    if (rotationAxis.Length() < 1e-8f) {
+        return (Normal3f) polyNormal;
+    }
+    Normal3f normalizedTarget = isect.shading.n;
+    float angle = acos(std::max(std::min(Dot(polyNormal, normalizedTarget), 1.0f), -1.0f));
+    Transform transf = pbrt::Rotate(Degrees(angle), rotationAxis);
+    inDir = transf(inDir);
+    return (Normal3f) polyNormal;
+}
+
 } // namespace pbrt.
