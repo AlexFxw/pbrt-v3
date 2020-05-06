@@ -92,7 +92,7 @@ struct Interaction {
         return mediumInterface.inside;
     }
 
-    const float* GetPolyCoeffs() const {
+    const Float* GetPolyCoeffs() const {
         if(polyStorage != nullptr) {
             return polyStorage->coeffs;
         }

@@ -69,7 +69,6 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, con
                            const Vector3f &w, Sampler &sampler, int nSamples) const {
     const Point3f &po = this->po.p;
     const Vector3f &wo = this->po.wo;
-    SurfaceInteraction sampledIsect; // TODO: Make use of this, it is projected one.
     // TODO: Compute albedo
     Spectrum albedo = mAlbedo;
     Vector3f inDir = -w;
@@ -79,7 +78,7 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, con
                                                                               PolyUtils::GetFitScaleFactor(mMedium, i),
                                                                               i);
             sRecs[i] = mVaeHandler->Sample(po, wo, &scene, polyNormal, mSigmaT, albedo,
-                                           this->g, this->eta, sampler, itact, &sampledIsect, true, i);
+                                           this->g, this->eta, sampler, itact, true, i);
             Spectrum tmp = sRecs[i].throughout;
             sRecs[i].throughout = Spectrum(0.0f);
             sRecs[i].throughout[i] = tmp[i] * 3.0f;
@@ -92,36 +91,32 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, con
                                                                           PolyUtils::GetFitScaleFactor(mMedium),
                                                                           channel);
         sRecs[0] = mVaeHandler->Sample(po, inDir, &scene, polyNormal, mSigmaT, albedo,
-                                       this->g, this->eta, sampler, itact, &sampledIsect, true, channel);
+                                       this->g, this->eta, sampler, itact, true, channel);
     }
 }
 
-Spectrum VaeScatter::Sample_Sp(const Scene &scene, MemoryArena &arena,
-                               SurfaceInteraction *pi, Float *pdf) const {
-    // TODO: Initialize pdf;
-    // TODO: Initialize pi, and pi->shading.
+Spectrum VaeScatter::Sample_Sp(const Scene &scene, ScatterSamplingRecord *sRecs,
+                               Float *pdf, int nSamples) const {
+    // TODO: Initialize pi, and pi->shading, pdf.
+    // FIXME: Check the calculation of Sp function.
     ProfilePhase pp(Prof::BSSRDFEvaluation);
-    // FIXME: Sample subsurface scattering. Use 3 nSamples here
-    int nSamples = 3;
-    ScatterSamplingRecord sRecRgb[nSamples];
+    CHECK_GE(nSamples, 0);
+    CHECK_LE(nSamples, 3);
     Vector3f refractedW = -this->po.wo; // FIXME: to the world transformation?
-    Sample_Pi(sRecRgb, scene, this->po, refractedW, *mSampler, nSamples);
+    Sample_Pi(sRecs, scene, this->po, refractedW, *mSampler, nSamples);
     Spectrum res;
     Point3f pos;
     Normal3f normal;
     int nMissed = 0;
     for (int i = 0; i < nSamples; i++) {
-        if (!sRecRgb[i].isValid) {
+        if (!sRecs[i].isValid) {
             nMissed++;
             continue;
         }
-        pos = sRecRgb[i].p;
-        normal = sRecRgb[i].n;
-        res += sRecRgb[i].throughout;
+        pos = sRecs[i].p;
+        normal = sRecs[i].n;
+        res += sRecs[i].throughout;
     }
-    pi = ARENA_ALLOC(arena, SurfaceInteraction)();
-    pi->p = pos;
-    pi->n = normal;
     return res / (Float) nSamples;
 }
 

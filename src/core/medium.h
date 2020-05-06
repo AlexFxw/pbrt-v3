@@ -79,7 +79,7 @@ struct MediumParameters {
     MediumParameters() {}
     MediumParameters(const Spectrum &albedo, Float g, Float eta, const Spectrum &sigmaT)
             : albedo(albedo), sigmaT(sigmaT), g(g), eta(eta) {}
-    inline bool isRgb() const { return (sigmaT.min() != sigmaT.max()) || (albedo.min() != albedo.max()); }
+    inline bool isRgb() const { return true; } // FIXME: not always true
 };
 
 // Medium Declarations

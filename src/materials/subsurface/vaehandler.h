@@ -75,7 +75,7 @@ protected:
     int mPolyOrder;
     MediumParameters mAvgMedium;
 
-    std::shared_ptr<TriangleMesh> PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes);
+    static std::shared_ptr<TriangleMesh> PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes);
 
 };
 

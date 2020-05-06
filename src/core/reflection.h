@@ -43,6 +43,7 @@
 #include "geometry.h"
 #include "microfacet.h"
 #include "shape.h"
+#include "interaction.h"
 #include "spectrum.h"
 
 namespace pbrt {

@@ -41,9 +41,6 @@
 // core/shape.h*
 #include "pbrt.h"
 #include "geometry.h"
-#include "interaction.h"
-#include "memory.h"
-#include "transform.h"
 
 namespace pbrt {
 

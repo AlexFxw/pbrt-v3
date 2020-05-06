@@ -39,6 +39,8 @@
 #define PBRT_SHAPES_TRIANGLE_H
 
 // shapes/triangle.h*
+#include "pbrt.h"
+#include "geometry.h"
 #include "shape.h"
 #include "stats.h"
 #include <map>

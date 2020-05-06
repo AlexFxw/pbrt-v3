@@ -49,6 +49,7 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     for (int i = 0; i < shapeCoeffEigenWs.size(); i++) {
         shapeCoeffEigenWs[i] = coeffs[i];
     }
+    // Calculate the polynomial coefficients
     std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
     const Eigen::Vector3f inPos(po.x, po.y, po.z);
     const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
@@ -67,9 +68,10 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
                                                      asTransform);
     ScatterSamplingRecord sRec;
     sRec.throughout = Spectrum(1.0f - absorption);
-    sRec.w = Vector3f(); // FIXME
+    sRec.w = Vector3f(1.0, 0, 0); // FIXME
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
     sRec.isValid = absorption < 1.0f;
+    // Project the sampled points to the surface.
     PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
                                       mConfig.polyOrder, false, fitScaleFactor, kernelEps);
     return sRec;
