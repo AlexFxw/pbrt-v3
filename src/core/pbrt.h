@@ -259,11 +259,16 @@ class VaeHandler;
 
 class VaeHandlerEigen;
 
+class ScatterModelBase;
+
 struct Polynomial;
 
 struct PolyStorage;
 
 struct ScatterSamplingRecord;
+
+template<size_t PolyOrder = 3, size_t LayerWidth = 64>
+class AbsorptionModel;
 
 // Global Constants
 #ifdef _MSC_VER

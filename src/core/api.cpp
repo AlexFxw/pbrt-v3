@@ -80,6 +80,8 @@
 #include "materials/substrate.h"
 #include "materials/subsurface.h"
 #include "materials/translucent.h"
+#include "materials/subsurface/vaesubsurface.h"
+#include "materials/subsurface/vaeconfig.h"
 #include "materials/uber.h"
 #include "samplers/halton.h"
 #include "samplers/maxmin.h"
@@ -582,6 +584,8 @@ std::shared_ptr<Material> MakeMaterial(const std::string &name,
         material = CreateUberMaterial(mp);
     else if (name == "subsurface")
         material = CreateSubsurfaceMaterial(mp);
+    else if (name == "vaesubsurface")
+        material = CreateVaeSubsurfaceMaterial(mp);
     else if (name == "kdsubsurface")
         material = CreateKdSubsurfaceMaterial(mp);
     else if (name == "fourier")

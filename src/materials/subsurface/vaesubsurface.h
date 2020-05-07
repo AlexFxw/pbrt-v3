@@ -31,6 +31,8 @@ public:
 
 };
 
+VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp);
+
 }
 
 #endif //PBRT_V3_VAESUBSURFACE_H

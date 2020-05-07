@@ -371,6 +371,7 @@ INCLUDE_DIRECTORIES ( src/ext/tensorflow/include )
 FILE ( GLOB TF_LIB
   src/ext/tensorflow/lib/*.dylib
 )
+INCLUDE_DIRECTORIES(/usr/local/include) #FIXME: Include Eigen as a subdirectory instead.
 
 ###########################################################################
 # On to pbrt...

@@ -103,21 +103,6 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     }
 }
 
-template<size_t PolyOrder = 3>
-std::pair<Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1>, Transform>
-VaeHandler::GetPolyCoeffsAs(const Point3f &p, const Vector3f &d,
-                            const Normal3f &polyNormal,
-                            const Interaction &its, int channel) {
-    const float *coeffs = its.GetPolyCoeffs(channel);
-    Transform transf = AzimuthSpaceTransform(-d, polyNormal);
-    Matrix4x4 &m = transf.GetMatrix();
-    Vector3f s(m(0, 0), m(0, 1), m(0,2));
-    Vector3f t(m(1, 0), m(1, 1), m(1,2));
-    Normal3f n(m(2, 0), m(2, 1), m(2,2));
-    Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> shapeCoeffs =
-            PolyUtils::RotatePolynomialEigen<PolyOrder>(coeffs, s, t, n);
-    return std::make_pair(shapeCoeffs, transf);
-}
 
 std::shared_ptr<TriangleMesh> VaeHandler::PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes) {
     // "shapes" is the collection of triangles.
@@ -138,7 +123,7 @@ std::shared_ptr<TriangleMesh> VaeHandler::PreprocessTriangles(const std::vector<
     return triMesh;
 }
 
-void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
+void VaeHandler::OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
     float sign = copysignf(1.0f, n.z);
     const Float a = -1.0f / (sign + n.z);
     const Float b = n.x * n.y * a;
@@ -146,7 +131,7 @@ void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
     b2 = Vector3f(b, sign + n.y * n.y * a, -n.y);
 }
 
-Transform AzimuthSpaceTransform(const Vector3f &lightDir, const Normal3f &normal) {
+Transform VaeHandler::AzimuthSpaceTransform(const Vector3f &lightDir, const Normal3f &normal) {
     // TODO: Verify
     Normal3f t1(pbrt::Cross(normal, lightDir));
     Normal3f t2(pbrt::Cross(lightDir, t1));

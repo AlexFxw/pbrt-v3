@@ -7,8 +7,8 @@
  */
 
 #include "network_utils.h"
+#include <fstream>
 #include <Eigen/Core>
-#include <Eigen/Dense>
 
 namespace pbrt {
 

@@ -11,9 +11,9 @@
 
 #include "pbrt.h"
 #include "json.h"
-#include "vaehandler.h"
 #include "transform.h"
 #include "spectrum.h"
+#include "sampler.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
@@ -32,6 +32,26 @@ public:
     static inline constexpr int nInFeatures(int polyOrder) { return nPolyCoeffs(polyOrder) + 3; }
 
     static inline float sigmoid(float x) { return 1.0f / (1.0f + std::exp(-x)); }
+
+    static void SampleGaussianVector(float *data, Sampler &sampler, int nVars) {
+        bool odd = nVars % 2;
+        int idx = 0;
+        for (int i = 0; i < nVars / 2; ++i) {
+            Point2f uv = pbrt::SquareToStdNormal(sampler.Get2D());
+            data[idx] = uv.x;
+            ++idx;
+            data[idx] = uv.y;
+            ++idx;
+        }
+        if (odd)
+            data[idx] = pbrt::SquareToStdNormal(sampler.Get2D()).x;
+    }
+
+    static void SampleUniformVector(float *data, Sampler *sampler, int nVars) {
+        for (int i = 0; i < nVars; ++i) {
+            data[i] = sampler->Get1D();
+        }
+    }
 
     static Eigen::VectorXf LoadVectorDynamic(const std::string &filename);
 
@@ -70,7 +90,7 @@ public:
     }
 };
 
-template<size_t PolyOrder = 3, size_t LayerWidth = 64>
+template<size_t PolyOrder, size_t LayerWidth>
 class AbsorptionModel {
 public:
     typedef Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(PolyOrder), 1> ShapeVector;
@@ -221,7 +241,7 @@ public:
         // Concatenate features with random numbers
 
         Eigen::Matrix<float, NLatent, 1> latent(NLatent);
-        VaeHandler::SampleGaussianVector(latent.data(), sampler, NLatent);
+        NetworkUtils::SampleGaussianVector(latent.data(), sampler, NLatent);
 
         Eigen::Matrix<float, PreLayerWidth + NLatent, 1> featLatent;
         featLatent << latent, features;

@@ -11,3 +11,4 @@ src/materials/subsurface/variables
 src/ext/tensorflow
 *.exr
 *.DS_Store
+scenes/dragon

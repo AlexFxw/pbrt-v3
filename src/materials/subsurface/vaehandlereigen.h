@@ -8,6 +8,7 @@
 #include "pbrt.h"
 #include "vaehandler.h"
 #include "network_utils.h"
+#include "bssrdf.h"
 
 namespace pbrt {
 
@@ -19,15 +20,17 @@ public:
                 const std::string &absModelName, const std::string &angularModelName,
                 const std::string &outputDir, int batchSize,
                 const pbrt::PolyUtils::PolyFitConfig &pfConfig);
-    virtual ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
-                                         const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
-                                         const Spectrum &albedo, float g, float eta, Sampler &sampler,
-                                         const Interaction &isect, bool projectSamples, int channel) const override;
+
+    ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
+                                 const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
+                                 const Spectrum &albedo, float g, float eta, Sampler &sampler,
+                                 const Interaction &isect, bool projectSamples, int channel) const override;
+
 private:
-    AbsorptionModel<3> absModel;
+    AbsorptionModel<3> absModel; // TODO: initialize
     std::unique_ptr<ScatterModelBase> scatterModel;
     Spectrum mEffectiveAlbedo;
-    Float mKernelEpsScale; // TODO: need to be initialize
+    Float mKernelEpsScale;
 };
 
 }
