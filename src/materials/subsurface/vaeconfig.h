@@ -7,6 +7,7 @@
 
 #include "pbrt.h"
 #include "json.h"
+#include <fstream>
 
 using json = nlohmann::json;
 

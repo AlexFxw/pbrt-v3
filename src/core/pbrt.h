@@ -259,7 +259,7 @@ class VaeHandler;
 
 class VaeHandlerEigen;
 
-struct PolyNomial;
+struct Polynomial;
 
 struct PolyStorage;
 

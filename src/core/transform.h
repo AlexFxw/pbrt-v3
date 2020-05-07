@@ -52,25 +52,30 @@ struct Matrix4x4 {
     Matrix4x4() {
         m[0][0] = m[1][1] = m[2][2] = m[3][3] = 1.f;
         m[0][1] = m[0][2] = m[0][3] = m[1][0] = m[1][2] = m[1][3] = m[2][0] =
-            m[2][1] = m[2][3] = m[3][0] = m[3][1] = m[3][2] = 0.f;
+        m[2][1] = m[2][3] = m[3][0] = m[3][1] = m[3][2] = 0.f;
     }
+
     Matrix4x4(Float mat[4][4]);
     Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10, Float t11,
               Float t12, Float t13, Float t20, Float t21, Float t22, Float t23,
               Float t30, Float t31, Float t32, Float t33);
+
     bool operator==(const Matrix4x4 &m2) const {
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j)
                 if (m[i][j] != m2.m[i][j]) return false;
         return true;
     }
+
     bool operator!=(const Matrix4x4 &m2) const {
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j)
                 if (m[i][j] != m2.m[i][j]) return true;
         return false;
     }
+
     friend Matrix4x4 Transpose(const Matrix4x4 &);
+
     void Print(FILE *f) const {
         fprintf(f, "[ ");
         for (int i = 0; i < 4; ++i) {
@@ -83,6 +88,7 @@ struct Matrix4x4 {
         }
         fprintf(f, " ] ");
     }
+
     static Matrix4x4 Mul(const Matrix4x4 &m1, const Matrix4x4 &m2) {
         Matrix4x4 r;
         for (int i = 0; i < 4; ++i)
@@ -91,6 +97,7 @@ struct Matrix4x4 {
                             m1.m[i][2] * m2.m[2][j] + m1.m[i][3] * m2.m[3][j];
         return r;
     }
+
     friend Matrix4x4 Inverse(const Matrix4x4 &);
 
     friend std::ostream &operator<<(std::ostream &os, const Matrix4x4 &m) {
@@ -107,14 +114,17 @@ struct Matrix4x4 {
         return os;
     }
 
+    Float operator()(int i, int j) const { return m[i][j]; }
+
     Float m[4][4];
 };
 
 // Transform Declarations
 class Transform {
-  public:
+public:
     // Transform Public Methods
     Transform() {}
+
     Transform(const Float mat[4][4]) {
         m = Matrix4x4(mat[0][0], mat[0][1], mat[0][2], mat[0][3], mat[1][0],
                       mat[1][1], mat[1][2], mat[1][3], mat[2][0], mat[2][1],
@@ -122,21 +132,29 @@ class Transform {
                       mat[3][3]);
         mInv = Inverse(m);
     }
+
     Transform(const Matrix4x4 &m) : m(m), mInv(Inverse(m)) {}
+
     Transform(const Matrix4x4 &m, const Matrix4x4 &mInv) : m(m), mInv(mInv) {}
+
     void Print(FILE *f) const;
+
     friend Transform Inverse(const Transform &t) {
         return Transform(t.mInv, t.m);
     }
+
     friend Transform Transpose(const Transform &t) {
         return Transform(Transpose(t.m), Transpose(t.mInv));
     }
+
     bool operator==(const Transform &t) const {
         return t.m == m && t.mInv == mInv;
     }
+
     bool operator!=(const Transform &t) const {
         return t.m != m || t.mInv != mInv;
     }
+
     bool operator<(const Transform &t2) const {
         for (int i = 0; i < 4; ++i)
             for (int j = 0; j < 4; ++j) {
@@ -145,6 +163,7 @@ class Transform {
             }
         return false;
     }
+
     bool IsIdentity() const {
         return (m.m[0][0] == 1.f && m.m[0][1] == 0.f && m.m[0][2] == 0.f &&
                 m.m[0][3] == 0.f && m.m[1][0] == 0.f && m.m[1][1] == 1.f &&
@@ -153,8 +172,11 @@ class Transform {
                 m.m[3][0] == 0.f && m.m[3][1] == 0.f && m.m[3][2] == 0.f &&
                 m.m[3][3] == 1.f);
     }
+
     const Matrix4x4 &GetMatrix() const { return m; }
+
     const Matrix4x4 &GetInverseMatrix() const { return mInv; }
+
     bool HasScale() const {
         Float la2 = (*this)(Vector3f(1, 0, 0)).LengthSquared();
         Float lb2 = (*this)(Vector3f(0, 1, 0)).LengthSquared();
@@ -163,11 +185,12 @@ class Transform {
         return (NOT_ONE(la2) || NOT_ONE(lb2) || NOT_ONE(lc2));
 #undef NOT_ONE
     }
-    template <typename T>
+
+    template<typename T>
     inline Point3<T> operator()(const Point3<T> &p) const;
-    template <typename T>
+    template<typename T>
     inline Vector3<T> operator()(const Vector3<T> &v) const;
-    template <typename T>
+    template<typename T>
     inline Normal3<T> operator()(const Normal3<T> &) const;
     inline Ray operator()(const Ray &r) const;
     inline RayDifferential operator()(const RayDifferential &r) const;
@@ -175,16 +198,16 @@ class Transform {
     Transform operator*(const Transform &t2) const;
     bool SwapsHandedness() const;
     SurfaceInteraction operator()(const SurfaceInteraction &si) const;
-    template <typename T>
+    template<typename T>
     inline Point3<T> operator()(const Point3<T> &pt,
                                 Vector3<T> *absError) const;
-    template <typename T>
+    template<typename T>
     inline Point3<T> operator()(const Point3<T> &p, const Vector3<T> &pError,
                                 Vector3<T> *pTransError) const;
-    template <typename T>
+    template<typename T>
     inline Vector3<T> operator()(const Vector3<T> &v,
                                  Vector3<T> *vTransError) const;
-    template <typename T>
+    template<typename T>
     inline Vector3<T> operator()(const Vector3<T> &v, const Vector3<T> &vError,
                                  Vector3<T> *vTransError) const;
     inline Ray operator()(const Ray &r, Vector3f *oError,
@@ -198,10 +221,12 @@ class Transform {
         return os;
     }
 
-  private:
+private:
     // Transform Private Data
     Matrix4x4 m, mInv;
+
     friend class AnimatedTransform;
+
     friend struct Quaternion;
 };
 
@@ -218,7 +243,7 @@ bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], Float *x0,
                           Float *x1);
 
 // Transform Inline Functions
-template <typename T>
+template<typename T>
 inline Point3<T> Transform::operator()(const Point3<T> &p) const {
     T x = p.x, y = p.y, z = p.z;
     T xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z + m.m[0][3];
@@ -232,7 +257,7 @@ inline Point3<T> Transform::operator()(const Point3<T> &p) const {
         return Point3<T>(xp, yp, zp) / wp;
 }
 
-template <typename T>
+template<typename T>
 inline Vector3<T> Transform::operator()(const Vector3<T> &v) const {
     T x = v.x, y = v.y, z = v.z;
     return Vector3<T>(m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z,
@@ -240,7 +265,7 @@ inline Vector3<T> Transform::operator()(const Vector3<T> &v) const {
                       m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
 }
 
-template <typename T>
+template<typename T>
 inline Normal3<T> Transform::operator()(const Normal3<T> &n) const {
     T x = n.x, y = n.y, z = n.z;
     return Normal3<T>(mInv.m[0][0] * x + mInv.m[1][0] * y + mInv.m[2][0] * z,
@@ -274,7 +299,7 @@ inline RayDifferential Transform::operator()(const RayDifferential &r) const {
     return ret;
 }
 
-template <typename T>
+template<typename T>
 inline Point3<T> Transform::operator()(const Point3<T> &p,
                                        Vector3<T> *pError) const {
     T x = p.x, y = p.y, z = p.z;
@@ -299,7 +324,7 @@ inline Point3<T> Transform::operator()(const Point3<T> &p,
         return Point3<T>(xp, yp, zp) / wp;
 }
 
-template <typename T>
+template<typename T>
 inline Point3<T> Transform::operator()(const Point3<T> &pt,
                                        const Vector3<T> &ptError,
                                        Vector3<T> *absError) const {
@@ -309,23 +334,23 @@ inline Point3<T> Transform::operator()(const Point3<T> &pt,
     T zp = (m.m[2][0] * x + m.m[2][1] * y) + (m.m[2][2] * z + m.m[2][3]);
     T wp = (m.m[3][0] * x + m.m[3][1] * y) + (m.m[3][2] * z + m.m[3][3]);
     absError->x =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[0][0]) * ptError.x + std::abs(m.m[0][1]) * ptError.y +
              std::abs(m.m[0][2]) * ptError.z) +
-        gamma(3) * (std::abs(m.m[0][0] * x) + std::abs(m.m[0][1] * y) +
-                    std::abs(m.m[0][2] * z) + std::abs(m.m[0][3]));
+            gamma(3) * (std::abs(m.m[0][0] * x) + std::abs(m.m[0][1] * y) +
+                        std::abs(m.m[0][2] * z) + std::abs(m.m[0][3]));
     absError->y =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[1][0]) * ptError.x + std::abs(m.m[1][1]) * ptError.y +
              std::abs(m.m[1][2]) * ptError.z) +
-        gamma(3) * (std::abs(m.m[1][0] * x) + std::abs(m.m[1][1] * y) +
-                    std::abs(m.m[1][2] * z) + std::abs(m.m[1][3]));
+            gamma(3) * (std::abs(m.m[1][0] * x) + std::abs(m.m[1][1] * y) +
+                        std::abs(m.m[1][2] * z) + std::abs(m.m[1][3]));
     absError->z =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[2][0]) * ptError.x + std::abs(m.m[2][1]) * ptError.y +
              std::abs(m.m[2][2]) * ptError.z) +
-        gamma(3) * (std::abs(m.m[2][0] * x) + std::abs(m.m[2][1] * y) +
-                    std::abs(m.m[2][2] * z) + std::abs(m.m[2][3]));
+            gamma(3) * (std::abs(m.m[2][0] * x) + std::abs(m.m[2][1] * y) +
+                        std::abs(m.m[2][2] * z) + std::abs(m.m[2][3]));
     CHECK_NE(wp, 0);
     if (wp == 1.)
         return Point3<T>(xp, yp, zp);
@@ -333,47 +358,47 @@ inline Point3<T> Transform::operator()(const Point3<T> &pt,
         return Point3<T>(xp, yp, zp) / wp;
 }
 
-template <typename T>
+template<typename T>
 inline Vector3<T> Transform::operator()(const Vector3<T> &v,
                                         Vector3<T> *absError) const {
     T x = v.x, y = v.y, z = v.z;
     absError->x =
-        gamma(3) * (std::abs(m.m[0][0] * v.x) + std::abs(m.m[0][1] * v.y) +
-                    std::abs(m.m[0][2] * v.z));
+            gamma(3) * (std::abs(m.m[0][0] * v.x) + std::abs(m.m[0][1] * v.y) +
+                        std::abs(m.m[0][2] * v.z));
     absError->y =
-        gamma(3) * (std::abs(m.m[1][0] * v.x) + std::abs(m.m[1][1] * v.y) +
-                    std::abs(m.m[1][2] * v.z));
+            gamma(3) * (std::abs(m.m[1][0] * v.x) + std::abs(m.m[1][1] * v.y) +
+                        std::abs(m.m[1][2] * v.z));
     absError->z =
-        gamma(3) * (std::abs(m.m[2][0] * v.x) + std::abs(m.m[2][1] * v.y) +
-                    std::abs(m.m[2][2] * v.z));
+            gamma(3) * (std::abs(m.m[2][0] * v.x) + std::abs(m.m[2][1] * v.y) +
+                        std::abs(m.m[2][2] * v.z));
     return Vector3<T>(m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z,
                       m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z,
                       m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
 }
 
-template <typename T>
+template<typename T>
 inline Vector3<T> Transform::operator()(const Vector3<T> &v,
                                         const Vector3<T> &vError,
                                         Vector3<T> *absError) const {
     T x = v.x, y = v.y, z = v.z;
     absError->x =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[0][0]) * vError.x + std::abs(m.m[0][1]) * vError.y +
              std::abs(m.m[0][2]) * vError.z) +
-        gamma(3) * (std::abs(m.m[0][0] * v.x) + std::abs(m.m[0][1] * v.y) +
-                    std::abs(m.m[0][2] * v.z));
+            gamma(3) * (std::abs(m.m[0][0] * v.x) + std::abs(m.m[0][1] * v.y) +
+                        std::abs(m.m[0][2] * v.z));
     absError->y =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[1][0]) * vError.x + std::abs(m.m[1][1]) * vError.y +
              std::abs(m.m[1][2]) * vError.z) +
-        gamma(3) * (std::abs(m.m[1][0] * v.x) + std::abs(m.m[1][1] * v.y) +
-                    std::abs(m.m[1][2] * v.z));
+            gamma(3) * (std::abs(m.m[1][0] * v.x) + std::abs(m.m[1][1] * v.y) +
+                        std::abs(m.m[1][2] * v.z));
     absError->z =
-        (gamma(3) + (T)1) *
+            (gamma(3) + (T) 1) *
             (std::abs(m.m[2][0]) * vError.x + std::abs(m.m[2][1]) * vError.y +
              std::abs(m.m[2][2]) * vError.z) +
-        gamma(3) * (std::abs(m.m[2][0] * v.x) + std::abs(m.m[2][1] * v.y) +
-                    std::abs(m.m[2][2] * v.z));
+            gamma(3) * (std::abs(m.m[2][0] * v.x) + std::abs(m.m[2][1] * v.y) +
+                        std::abs(m.m[2][2] * v.z));
     return Vector3<T>(m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z,
                       m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z,
                       m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
@@ -410,7 +435,7 @@ inline Ray Transform::operator()(const Ray &r, const Vector3f &oErrorIn,
 
 // AnimatedTransform Declarations
 class AnimatedTransform {
-  public:
+public:
     // AnimatedTransform Public Methods
     AnimatedTransform(const Transform *startTransform, Float startTime,
                       const Transform *endTransform, Float endTime);
@@ -421,13 +446,15 @@ class AnimatedTransform {
     RayDifferential operator()(const RayDifferential &r) const;
     Point3f operator()(Float time, const Point3f &p) const;
     Vector3f operator()(Float time, const Vector3f &v) const;
+
     bool HasScale() const {
         return startTransform->HasScale() || endTransform->HasScale();
     }
+
     Bounds3f MotionBounds(const Bounds3f &b) const;
     Bounds3f BoundPointMotion(const Point3f &p) const;
 
-  private:
+private:
     // AnimatedTransform Private Data
     const Transform *startTransform, *endTransform;
     const Float startTime, endTime;
@@ -436,15 +463,20 @@ class AnimatedTransform {
     Quaternion R[2];
     Matrix4x4 S[2];
     bool hasRotation;
+
     struct DerivativeTerm {
         DerivativeTerm() {}
+
         DerivativeTerm(Float c, Float x, Float y, Float z)
-            : kc(c), kx(x), ky(y), kz(z) {}
+                : kc(c), kx(x), ky(y), kz(z) {}
+
         Float kc, kx, ky, kz;
+
         Float Eval(const Point3f &p) const {
             return kc + kx * p.x + ky * p.y + kz * p.z;
         }
     };
+
     DerivativeTerm c1[3], c2[3], c3[3], c4[3], c5[3];
 };
 

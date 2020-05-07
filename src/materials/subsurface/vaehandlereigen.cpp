@@ -45,7 +45,7 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     Transform asTransform;
 
     // TODO: prediction scope
-    const float *coeffs = isect.GetPolyCoeffs()[channel];
+    const Float *coeffs = isect.GetPolyCoeffs(channel);
     for (int i = 0; i < shapeCoeffEigenWs.size(); i++) {
         shapeCoeffEigenWs[i] = coeffs[i];
     }

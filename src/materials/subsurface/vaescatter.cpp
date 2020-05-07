@@ -14,10 +14,6 @@
 namespace pbrt {
 
 
-VaeScatter::VaeScatter() {
-    mVaeHandler = nullptr;
-}
-
 VaeScatter::~VaeScatter() {
     if (mVaeHandler)
         delete mVaeHandler;
@@ -56,7 +52,8 @@ Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                               Float *pdf) const {
     // TODO: 采样 S 函数的值，将其储存于 pdf 和 si 中, 並初始化完成 VAE 模式的 BSDF
     ProfilePhase pp(Prof::BSSRDFSampling);
-    Spectrum Sp = Sample_Sp(scene, arena, si, pdf);
+    ScatterSamplingRecord sRecs[3];
+    Spectrum Sp = Sample_Sp(scene, sRecs, pdf, 3);
     if (!Sp.IsBlack()) {
         si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
         si->wo = Vector3f(si->shading.n);

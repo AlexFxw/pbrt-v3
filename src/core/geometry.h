@@ -1622,7 +1622,7 @@ inline Float SphericalPhi(const Vector3f &v) {
     return (p < 0) ? (p + 2 * Pi) : p;
 }
 
-Point2f SquareToStdNormal(const Point2f &sample) {
+inline Point2f SquareToStdNormal(const Point2f &sample) {
     Float r = std::sqrt(-2 * std::log(1 - sample.x)),
             phi = 2 * M_PI * sample.y;
     Point2f result;

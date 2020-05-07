@@ -93,7 +93,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
         pfRec.config.useLightspace = false;
         PolyUtils::Polynomial res;
         std::vector<Point3f> pts;
-        std::vector<Vector3f> dirs;
+        std::vector<Normal3f> dirs;
         std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &(mKDTrees[channel].back()));
         for (int k = 0; k < res.coeffs.size(); k++) {
             polyCoeffs[i].coeffs[channel][k] = res.coeffs[k];
@@ -108,12 +108,12 @@ std::pair<Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1>, Transform>
 VaeHandler::GetPolyCoeffsAs(const Point3f &p, const Vector3f &d,
                             const Normal3f &polyNormal,
                             const Interaction &its, int channel) {
-    const float *coeffs = its.GetPolyCoeffs();
+    const float *coeffs = its.GetPolyCoeffs(channel);
     Transform transf = AzimuthSpaceTransform(-d, polyNormal);
     Matrix4x4 &m = transf.GetMatrix();
-    Vector3f s(m[0][0], m[0][1], m[0][2]);
-    Vector3f t(m[1][0], m[1][1], m[1][2]);
-    Normal3f n(m[2][0], m[2][1], m[2][2]);
+    Vector3f s(m(0, 0), m(0, 1), m(0,2));
+    Vector3f t(m(1, 0), m(1, 1), m(1,2));
+    Normal3f n(m(2, 0), m(2, 1), m(2,2));
     Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> shapeCoeffs =
             PolyUtils::RotatePolynomialEigen<PolyOrder>(coeffs, s, t, n);
     return std::make_pair(shapeCoeffs, transf);
@@ -150,9 +150,10 @@ Transform AzimuthSpaceTransform(const Vector3f &lightDir, const Normal3f &normal
     // TODO: Verify
     Normal3f t1(pbrt::Cross(normal, lightDir));
     Normal3f t2(pbrt::Cross(lightDir, t1));
+    Normal3f light(lightDir);
     if (std::abs(pbrt::Dot(normal, lightDir)) > 0.99999f) {
         Vector3f s, t;
-        OnbDuff(lightDir, s, t);
+        OnbDuff(light, s, t);
         Matrix4x4 lsMatrix(s.x, s.y, s.z, 0, t.x, t.y, t.z, 0, lightDir.x, lightDir.y, lightDir.z, 0, 0, 0, 0, 1.0f);
         return Transform(lsMatrix);
     } else {

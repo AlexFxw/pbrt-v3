@@ -69,34 +69,4 @@ Eigen::Vector3f NetworkUtils::LocalToWorld(const Eigen::Vector3f &inPos, const E
     }
 }
 
-template<size_t PolyOrder, bool useSimilarityTheory>
-Eigen::Matrix<float, NetworkUtils::nInFeatures(PolyOrder), 1>
-NetworkUtils::PreprocessFeatures(const Spectrum &albedo, float g, float ior, const Spectrum &sigmaT,
-                                 const Eigen::Matrix<float, nPolyCoeffs(PolyOrder), 1> &shapeFeatures, float albedoMean,
-                                 float albedoStdInv, float gMean, float gStdInv,
-                                 const Eigen::Matrix<float, nPolyCoeffs(PolyOrder), 1> &shapeFeatMean,
-                                 const Eigen::Matrix<float, nPolyCoeffs(PolyOrder), 1> &shapeFeatStdInv) {
-
-    float effectiveAlbedo;
-    if (useSimilarityTheory) {
-        Spectrum sigmaS = albedo * sigmaT;
-        Spectrum sigmaA = sigmaT - sigmaS;
-        Spectrum albedoP = (1 - g) * sigmaS / ((1 - g) * sigmaS + sigmaA);
-        effectiveAlbedo = pbrt::effectiveAlbedo(albedoP).average();
-    } else {
-        effectiveAlbedo = pbrt::effectiveAlbedo(albedo).average();
-    }
-    float albedoNorm = (effectiveAlbedo - albedoMean) * albedoStdInv;
-    float gNorm = (g - gMean) * gStdInv;
-    float iorNorm = 2.0f * (ior - 1.25f);
-    Eigen::Matrix<float, nPolyCoeffs(PolyOrder), 1> shapeFeaturesNorm =
-            (shapeFeatures - shapeFeatMean).cwiseProduct(shapeFeatStdInv);
-    Eigen::Matrix<float, nInFeatures(PolyOrder), 1> features;
-    features.segment(0, nPolyCoeffs(PolyOrder)) = shapeFeaturesNorm;
-    features[nPolyCoeffs(PolyOrder)] = albedoNorm;
-    features[nPolyCoeffs(PolyOrder) + 1] = gNorm;
-    features[nPolyCoeffs(PolyOrder) + 2] = iorNorm;
-    return features;
-}
-
 }

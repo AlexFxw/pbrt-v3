@@ -7,6 +7,7 @@
 
 #include "pbrt.h"
 #include "geometry.h"
+#include "core/medium.h"
 #include <Eigen/Core>
 
 namespace pbrt {
@@ -15,8 +16,8 @@ template<typename PointType, typename DataRecord>
 struct SimpleKDNode {
     typedef uint32_t IndexType;
     enum {
-        ELeafFlag = 0x10;
-        EAxisMask = 0x0F;
+        ELeafFlag = 0x10,
+        EAxisMask = 0x0F
     };
 
     PointType pos;
@@ -24,11 +25,11 @@ struct SimpleKDNode {
     DataRecord data;
     uint8_t flags;
 
-    PointType &GetPos() const { return pos; }
+    const PointType &GetPos() const { return pos; }
 
     SimpleKDNode() : pos(PointType()), right(0), data(), flags(0) {}
 
-    DataRecord &GetData() const { return data; }
+    DataRecord &GetData() { return data; }
 
     SimpleKDNode(const DataRecord &data) : pos(PointType()), right(0), data(data), flags(0) {}
 
@@ -37,6 +38,8 @@ struct SimpleKDNode {
     IndexType GetLeftIndex(IndexType self) const { return self + 1; }
 
     inline bool IsLeaf() const { return flags & (uint8_t) ELeafFlag; }
+
+    inline const PointType &GetPosition() const { return pos; }
 
     inline void SetPosition(const Point3f &pos) { this->pos = pos; }
 
@@ -51,7 +54,7 @@ struct SimpleKDNode {
     }
 
 
-    boid SetRightIndex(IndexType self, IndexType value) { right = value; }
+    void SetRightIndex(IndexType self, IndexType value) { right = value; }
 
     // Get the split axis of this node.
     uint16_t GetAxis() const { return flags & (uint8_t) EAxisMask; }
@@ -65,7 +68,7 @@ struct SimpleKDNode {
 template<typename NodeType>
 class PointKDTree {
 public:
-    typedef NodeType::IndexType IndexType;
+    typedef typename NodeType::IndexType IndexType;
 
     struct SearchResult {
         Float distSquared;
@@ -89,7 +92,11 @@ public:
 
     inline void Resize(size_t size) { mNodes.resize(size); }
 
-    inline bool HasRightChild(IndexType index) {
+    inline NodeType &operator[](size_t idx) { return mNodes[idx]; }
+
+    inline const NodeType &operator[](size_t idx) const { return mNodes[idx]; }
+
+    inline bool HasRightChild(IndexType index) const {
         return mNodes[index].GetRightIndex(index) != 0;
     }
 
@@ -100,7 +107,7 @@ public:
 
     inline size_t Size() const { return mNodes.size(); }
 
-    inline NodeType &operator[](size_t idx) { return m_nodes[idx]; }
+    inline const Bounds3f &GetAABB() const { return mAABB; }
 
     void Build(bool recomputeAABB = false) {
         if (recomputeAABB) {
@@ -110,7 +117,7 @@ public:
             }
         }
         std::vector<IndexType> indirection(mNodes.size());
-        for (size_t = 0; i < mNodes.size(); i++) {
+        for (size_t i = 0; i < mNodes.size(); i++) {
             indirection[i] = (IndexType) i;
         }
         mDepth = 0;
@@ -163,7 +170,7 @@ protected:
                 : m_nodes(nodes), m_axis(axis) {}
 
         bool operator()(const IndexType &i1, const IndexType &i2) const {
-            return m_nodes[i1].getPosition()[m_axis] < m_nodes[i2].getPosition()[m_axis];
+            return m_nodes[i1].GetPosition()[m_axis] < m_nodes[i2].GetPosition()[m_axis];
         }
 
     private:
@@ -186,14 +193,18 @@ public:
     };
 
     typedef SimpleKDNode<Point3f, ExtraData> TreeNode;
-    typedef PointKDTree<TreeNode> CTree;
-    void Build(const std::vector<Point3f> &sampledP, const std::vector<Noraml3f> &sampledN);
-    void GetConstraints(const Point3f &p, TreeNode node, TreeNode::IndexType index, const Bounds3f &aabb,
-                        std::vector<Point3f> &points, std::vector<Normal3f> &normals, std::vector<Float> &sampleWeights,
-                        Float kernelEps, const std::function<Float(Float, Float)> &kernelFunc) const;
+    typedef PointKDTree<SimpleKDNode<Point3f, ExtraData>> CTree;
+    void Build(const std::vector<Point3f> &sampledP, const std::vector<Normal3f> &sampledN);
+    std::tuple<std::vector<Point3f>, std::vector<Normal3f>, std::vector<Float>>
+    GetConstraints(const Point3f &p, Float kernelEps, const std::function<Float(Float, Float)> &kernel) const;
+
+
     std::tuple<Point3f, Normal3f, size_t> CalcAvgValues(TreeNode &node, TreeNode::IndexType index);
 
 private:
+    void GetConstraints(const Point3f &p, TreeNode node, TreeNode::IndexType index, const Bounds3f &aabb,
+                        std::vector<Point3f> &points, std::vector<Normal3f> &normals, std::vector<Float> &sampleWeights,
+                        Float kernelEps, const std::function<Float(Float, Float)> &kernelFunc) const;
     std::vector<Point3f> mPoints;
     std::vector<Normal3f> mNormals;
     CTree mTree;
@@ -243,7 +254,7 @@ public:
 
         /// Convert from local coordinates to world coordinates
         inline Vector3f toWorld(const Vector3f &v) const {
-            return s * v.x + t * v.y + n * v.z;
+            return s * v.x + t * v.y + (Vector3f) n * v.z;
         }
     };
 
@@ -257,7 +268,7 @@ public:
         std::vector<float> normalHistogram;
     };
 
-    static PBRT_CONSTEXPR size_t powerToIndex(size_t dx, size_t dy, size_t dz) {
+    static const size_t PowerToIndex(size_t dx, size_t dy, size_t dz) {
         // Converts a polynomial degree to a linear coefficient index
         auto d = dx + dy + dz;
         auto i = d - dx;
@@ -283,11 +294,11 @@ public:
         return hardSurfaceConstraint ? nChooseK(3 + polyOrder, polyOrder) - 1 : nChooseK(3 + polyOrder, polyOrder);
     }
 
-    static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
+    static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
     FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree);
 
     template<size_t polyOrder, bool hardSurfaceConstraint = true>
-    static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
+    static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
     FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree);
 
     static void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
@@ -298,10 +309,109 @@ public:
         b2 = Vector3f(b, sign + n.y * n.y * a, -n.y);
     }
 
+    static inline float powi(float f, int n) {
+        float ret = 1.0f;
+        for (int i = 0; i < n; ++i) {
+            ret *= f;
+        }
+        return ret;
+    }
+
     template<int order, typename T>
-    static Eigen::Matrix<float, nPolyCoeffs(order), 1> RotatePolynomialEigen(const T &c,
-                                                                             const Vector3f &s, const Vector3f &t,
-                                                                             const Normal3f &n);
+    static Eigen::Matrix<float, nPolyCoeffs(order, false), 1> RotatePolynomialEigen(const T &c,
+                                                                                    const Vector3f &s,
+                                                                                    const Vector3f &t,
+                                                                                    const Normal3f &n) {
+        Eigen::Matrix<float, nPolyCoeffs(order), 1> c2;
+        c2[0] = c[0];
+        c2[1] = c[1] * s[0] + c[2] * s[1] + c[3] * s[2];
+        c2[2] = c[1] * t[0] + c[2] * t[1] + c[3] * t[2];
+        c2[3] = c[1] * n[0] + c[2] * n[1] + c[3] * n[2];
+        c2[4] = c[4] * powi(s[0], 2) + c[5] * s[0] * s[1] + c[6] * s[0] * s[2] + c[7] * powi(s[1], 2) +
+                c[8] * s[1] * s[2] +
+                c[9] * powi(s[2], 2);
+        c2[5] = 2 * c[4] * s[0] * t[0] + c[5] * (s[0] * t[1] + s[1] * t[0]) + c[6] * (s[0] * t[2] + s[2] * t[0]) +
+                2 * c[7] * s[1] * t[1] + c[8] * (s[1] * t[2] + s[2] * t[1]) + 2 * c[9] * s[2] * t[2];
+        c2[6] = 2 * c[4] * n[0] * s[0] + c[5] * (n[0] * s[1] + n[1] * s[0]) + c[6] * (n[0] * s[2] + n[2] * s[0]) +
+                2 * c[7] * n[1] * s[1] + c[8] * (n[1] * s[2] + n[2] * s[1]) + 2 * c[9] * n[2] * s[2];
+        c2[7] = c[4] * powi(t[0], 2) + c[5] * t[0] * t[1] + c[6] * t[0] * t[2] + c[7] * powi(t[1], 2) +
+                c[8] * t[1] * t[2] +
+                c[9] * powi(t[2], 2);
+        c2[8] = 2 * c[4] * n[0] * t[0] + c[5] * (n[0] * t[1] + n[1] * t[0]) + c[6] * (n[0] * t[2] + n[2] * t[0]) +
+                2 * c[7] * n[1] * t[1] + c[8] * (n[1] * t[2] + n[2] * t[1]) + 2 * c[9] * n[2] * t[2];
+        c2[9] = c[4] * powi(n[0], 2) + c[5] * n[0] * n[1] + c[6] * n[0] * n[2] + c[7] * powi(n[1], 2) +
+                c[8] * n[1] * n[2] +
+                c[9] * powi(n[2], 2);
+        if (order > 2) {
+            c2[10] = c[10] * powi(s[0], 3) + c[11] * powi(s[0], 2) * s[1] + c[12] * powi(s[0], 2) * s[2] +
+                     c[13] * s[0] * powi(s[1], 2) + c[14] * s[0] * s[1] * s[2] + c[15] * s[0] * powi(s[2], 2) +
+                     c[16] * powi(s[1], 3) + c[17] * powi(s[1], 2) * s[2] + c[18] * s[1] * powi(s[2], 2) +
+                     c[19] * powi(s[2], 3);
+            c2[11] = 3 * c[10] * powi(s[0], 2) * t[0] + c[11] * (powi(s[0], 2) * t[1] + 2 * s[0] * s[1] * t[0]) +
+                     c[12] * (powi(s[0], 2) * t[2] + 2 * s[0] * s[2] * t[0]) +
+                     c[13] * (2 * s[0] * s[1] * t[1] + powi(s[1], 2) * t[0]) +
+                     c[14] * (s[0] * s[1] * t[2] + s[0] * s[2] * t[1] + s[1] * s[2] * t[0]) +
+                     c[15] * (2 * s[0] * s[2] * t[2] + powi(s[2], 2) * t[0]) + 3 * c[16] * powi(s[1], 2) * t[1] +
+                     c[17] * (powi(s[1], 2) * t[2] + 2 * s[1] * s[2] * t[1]) +
+                     c[18] * (2 * s[1] * s[2] * t[2] + powi(s[2], 2) * t[1]) + 3 * c[19] * powi(s[2], 2) * t[2];
+            c2[12] = 3 * c[10] * n[0] * powi(s[0], 2) + c[11] * (2 * n[0] * s[0] * s[1] + n[1] * powi(s[0], 2)) +
+                     c[12] * (2 * n[0] * s[0] * s[2] + n[2] * powi(s[0], 2)) +
+                     c[13] * (n[0] * powi(s[1], 2) + 2 * n[1] * s[0] * s[1]) +
+                     c[14] * (n[0] * s[1] * s[2] + n[1] * s[0] * s[2] + n[2] * s[0] * s[1]) +
+                     c[15] * (n[0] * powi(s[2], 2) + 2 * n[2] * s[0] * s[2]) + 3 * c[16] * n[1] * powi(s[1], 2) +
+                     c[17] * (2 * n[1] * s[1] * s[2] + n[2] * powi(s[1], 2)) +
+                     c[18] * (n[1] * powi(s[2], 2) + 2 * n[2] * s[1] * s[2]) + 3 * c[19] * n[2] * powi(s[2], 2);
+            c2[13] = 3 * c[10] * s[0] * powi(t[0], 2) + c[11] * (2 * s[0] * t[0] * t[1] + s[1] * powi(t[0], 2)) +
+                     c[12] * (2 * s[0] * t[0] * t[2] + s[2] * powi(t[0], 2)) +
+                     c[13] * (s[0] * powi(t[1], 2) + 2 * s[1] * t[0] * t[1]) +
+                     c[14] * (s[0] * t[1] * t[2] + s[1] * t[0] * t[2] + s[2] * t[0] * t[1]) +
+                     c[15] * (s[0] * powi(t[2], 2) + 2 * s[2] * t[0] * t[2]) + 3 * c[16] * s[1] * powi(t[1], 2) +
+                     c[17] * (2 * s[1] * t[1] * t[2] + s[2] * powi(t[1], 2)) +
+                     c[18] * (s[1] * powi(t[2], 2) + 2 * s[2] * t[1] * t[2]) + 3 * c[19] * s[2] * powi(t[2], 2);
+            c2[14] = 6 * c[10] * n[0] * s[0] * t[0] +
+                     c[11] * (2 * n[0] * s[0] * t[1] + 2 * n[0] * s[1] * t[0] + 2 * n[1] * s[0] * t[0]) +
+                     c[12] * (2 * n[0] * s[0] * t[2] + 2 * n[0] * s[2] * t[0] + 2 * n[2] * s[0] * t[0]) +
+                     c[13] * (2 * n[0] * s[1] * t[1] + 2 * n[1] * s[0] * t[1] + 2 * n[1] * s[1] * t[0]) +
+                     c[14] * (n[0] * s[1] * t[2] + n[0] * s[2] * t[1] + n[1] * s[0] * t[2] + n[1] * s[2] * t[0] +
+                              n[2] * s[0] * t[1] + n[2] * s[1] * t[0]) +
+                     c[15] * (2 * n[0] * s[2] * t[2] + 2 * n[2] * s[0] * t[2] + 2 * n[2] * s[2] * t[0]) +
+                     6 * c[16] * n[1] * s[1] * t[1] +
+                     c[17] * (2 * n[1] * s[1] * t[2] + 2 * n[1] * s[2] * t[1] + 2 * n[2] * s[1] * t[1]) +
+                     c[18] * (2 * n[1] * s[2] * t[2] + 2 * n[2] * s[1] * t[2] + 2 * n[2] * s[2] * t[1]) +
+                     6 * c[19] * n[2] * s[2] * t[2];
+            c2[15] = 3 * c[10] * powi(n[0], 2) * s[0] + c[11] * (powi(n[0], 2) * s[1] + 2 * n[0] * n[1] * s[0]) +
+                     c[12] * (powi(n[0], 2) * s[2] + 2 * n[0] * n[2] * s[0]) +
+                     c[13] * (2 * n[0] * n[1] * s[1] + powi(n[1], 2) * s[0]) +
+                     c[14] * (n[0] * n[1] * s[2] + n[0] * n[2] * s[1] + n[1] * n[2] * s[0]) +
+                     c[15] * (2 * n[0] * n[2] * s[2] + powi(n[2], 2) * s[0]) + 3 * c[16] * powi(n[1], 2) * s[1] +
+                     c[17] * (powi(n[1], 2) * s[2] + 2 * n[1] * n[2] * s[1]) +
+                     c[18] * (2 * n[1] * n[2] * s[2] + powi(n[2], 2) * s[1]) + 3 * c[19] * powi(n[2], 2) * s[2];
+            c2[16] = c[10] * powi(t[0], 3) + c[11] * powi(t[0], 2) * t[1] + c[12] * powi(t[0], 2) * t[2] +
+                     c[13] * t[0] * powi(t[1], 2) + c[14] * t[0] * t[1] * t[2] + c[15] * t[0] * powi(t[2], 2) +
+                     c[16] * powi(t[1], 3) + c[17] * powi(t[1], 2) * t[2] + c[18] * t[1] * powi(t[2], 2) +
+                     c[19] * powi(t[2], 3);
+            c2[17] = 3 * c[10] * n[0] * powi(t[0], 2) + c[11] * (2 * n[0] * t[0] * t[1] + n[1] * powi(t[0], 2)) +
+                     c[12] * (2 * n[0] * t[0] * t[2] + n[2] * powi(t[0], 2)) +
+                     c[13] * (n[0] * powi(t[1], 2) + 2 * n[1] * t[0] * t[1]) +
+                     c[14] * (n[0] * t[1] * t[2] + n[1] * t[0] * t[2] + n[2] * t[0] * t[1]) +
+                     c[15] * (n[0] * powi(t[2], 2) + 2 * n[2] * t[0] * t[2]) + 3 * c[16] * n[1] * powi(t[1], 2) +
+                     c[17] * (2 * n[1] * t[1] * t[2] + n[2] * powi(t[1], 2)) +
+                     c[18] * (n[1] * powi(t[2], 2) + 2 * n[2] * t[1] * t[2]) + 3 * c[19] * n[2] * powi(t[2], 2);
+            c2[18] = 3 * c[10] * powi(n[0], 2) * t[0] + c[11] * (powi(n[0], 2) * t[1] + 2 * n[0] * n[1] * t[0]) +
+                     c[12] * (powi(n[0], 2) * t[2] + 2 * n[0] * n[2] * t[0]) +
+                     c[13] * (2 * n[0] * n[1] * t[1] + powi(n[1], 2) * t[0]) +
+                     c[14] * (n[0] * n[1] * t[2] + n[0] * n[2] * t[1] + n[1] * n[2] * t[0]) +
+                     c[15] * (2 * n[0] * n[2] * t[2] + powi(n[2], 2) * t[0]) + 3 * c[16] * powi(n[1], 2) * t[1] +
+                     c[17] * (powi(n[1], 2) * t[2] + 2 * n[1] * n[2] * t[1]) +
+                     c[18] * (2 * n[1] * n[2] * t[2] + powi(n[2], 2) * t[1]) + 3 * c[19] * powi(n[2], 2) * t[2];
+            c2[19] = c[10] * powi(n[0], 3) + c[11] * powi(n[0], 2) * n[1] + c[12] * powi(n[0], 2) * n[2] +
+                     c[13] * n[0] * powi(n[1], 2) + c[14] * n[0] * n[1] * n[2] + c[15] * n[0] * powi(n[2], 2) +
+                     c[16] * powi(n[1], 3) + c[17] * powi(n[1], 2) * n[2] + c[18] * n[1] * powi(n[2], 2) +
+                     c[19] * powi(n[2], 3);
+        }
+        return c2;
+    }
+
     static void ProjectPointsToSurface(const Scene *scene, const Point3f &refPoint, const Vector3f &refDir,
                                        ScatterSamplingRecord &rec, const Eigen::VectorXf &polyCoefficients,
                                        size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps);

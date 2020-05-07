@@ -36,25 +36,40 @@
 #include "transform.h"
 #include "primitive.h"
 #include "shape.h"
+#include "shapes/triangle.h"
 #include "light.h"
 
 namespace pbrt {
 
+const Float *Interaction::GetPolyCoeffs(int channel) const {
+    if (polyStorage != nullptr) {
+        return (Float *) polyStorage->coeffs[channel];
+    }
+    return nullptr;
+}
+
 // SurfaceInteraction Method Definitions
 SurfaceInteraction::SurfaceInteraction(
-    const Point3f &p, const Vector3f &pError, const Point2f &uv,
-    const Vector3f &wo, const Vector3f &dpdu, const Vector3f &dpdv,
-    const Normal3f &dndu, const Normal3f &dndv, Float time, const Shape *shape,
-    int faceIndex)
-    : Interaction(p, Normal3f(Normalize(Cross(dpdu, dpdv))), pError, wo, time,
-                  nullptr),
-      uv(uv),
-      dpdu(dpdu),
-      dpdv(dpdv),
-      dndu(dndu),
-      dndv(dndv),
-      shape(shape),
-      faceIndex(faceIndex) {
+        const Point3f &p,
+        const Vector3f &pError,
+        const Point2f &uv,
+        const Vector3f &wo,
+        const Vector3f &dpdu,
+        const Vector3f &dpdv,
+        const Normal3f &dndu,
+        const Normal3f &dndv, Float
+        time,
+        const Shape *shape,
+        int faceIndex)
+        : Interaction(p, Normal3f(Normalize(Cross(dpdu, dpdv))), pError, wo, time,
+                      nullptr),
+          uv(uv),
+          dpdu(dpdu),
+          dpdv(dpdv),
+          dndu(dndu),
+          dndv(dndv),
+          shape(shape),
+          faceIndex(faceIndex) {
     // Initialize shading geometry from true geometry
     shading.n = n;
     shading.dpdu = dpdu;
@@ -76,7 +91,7 @@ void SurfaceInteraction::SetShadingGeometry(const Vector3f &dpdus,
                                             const Normal3f &dndvs,
                                             bool orientationIsAuthoritative) {
     // Compute _shading.n_ for _SurfaceInteraction_
-    shading.n = Normalize((Normal3f)Cross(dpdus, dpdvs));
+    shading.n = Normalize((Normal3f) Cross(dpdus, dpdvs));
     if (orientationIsAuthoritative)
         n = Faceforward(n, shading.n);
     else
@@ -99,18 +114,18 @@ void SurfaceInteraction::ComputeScatteringFunctions(const RayDifferential &ray,
 }
 
 void SurfaceInteraction::ComputeDifferentials(
-    const RayDifferential &ray) const {
+        const RayDifferential &ray) const {
     if (ray.hasDifferentials) {
         // Estimate screen space change in $\pt{}$ and $(u,v)$
 
         // Compute auxiliary intersection points with plane
         Float d = Dot(n, Vector3f(p.x, p.y, p.z));
         Float tx =
-            -(Dot(n, Vector3f(ray.rxOrigin)) - d) / Dot(n, ray.rxDirection);
+                -(Dot(n, Vector3f(ray.rxOrigin)) - d) / Dot(n, ray.rxDirection);
         if (std::isinf(tx) || std::isnan(tx)) goto fail;
         Point3f px = ray.rxOrigin + tx * ray.rxDirection;
         Float ty =
-            -(Dot(n, Vector3f(ray.ryOrigin)) - d) / Dot(n, ray.ryDirection);
+                -(Dot(n, Vector3f(ray.ryOrigin)) - d) / Dot(n, ray.ryDirection);
         if (std::isinf(ty) || std::isnan(ty)) goto fail;
         Point3f py = ray.ryOrigin + ty * ray.ryDirection;
         dpdx = px - p;
@@ -139,7 +154,7 @@ void SurfaceInteraction::ComputeDifferentials(
         if (!SolveLinearSystem2x2(A, Bx, &dudx, &dvdx)) dudx = dvdx = 0;
         if (!SolveLinearSystem2x2(A, By, &dudy, &dvdy)) dudy = dvdy = 0;
     } else {
-    fail:
+        fail:
         dudx = dvdx = 0;
         dudy = dvdy = 0;
         dpdx = dpdy = Vector3f(0, 0, 0);

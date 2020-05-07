@@ -6,10 +6,11 @@
 #include "geometry.h"
 #include "scene.h"
 #include "bssrdf.h"
+#include "shapes/triangle.h"
+#include "interaction.h"
 #include <cmath>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <core/interaction.h>
 
 namespace pbrt {
 
@@ -28,7 +29,7 @@ void basisFunFitBuildA(const Point3f &pos, const Vector3f &inDir, const std::vec
     size_t n = evalP.size();
     Eigen::Matrix<float, Eigen::Dynamic, 3 * (polyOrder + 1)> relPosPow(n, 3 * (polyOrder + 1));
     for (size_t i = 0; i < n; ++i) {
-        Vector rel = (evalP[i] - pos) * scaleFactor;
+        Vector3f rel = (evalP[i] - pos) * scaleFactor;
         for (size_t d = 0; d <= polyOrder; ++d) {
             relPosPow(i, d * 3 + 0) = std::pow(rel.x, d);
             relPosPow(i, d * 3 + 1) = std::pow(rel.y, d);
@@ -96,7 +97,7 @@ Eigen::VectorXi DerivPermutationEigen(size_t degree, size_t axis) {
 }
 
 
-void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::vector<Noraml3f> &sampledN) {
+void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::vector<Normal3f> &sampledN) {
     int pointsNum = sampledP.size();
     mTree = CTree(pointsNum);
 
@@ -105,10 +106,10 @@ void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::ve
         ExtraData d;
         d.p = sampledP[i];
         d.n = sampledN[i];
-        d.sampleCount = 1;
+        d.sampledNum = 1;
         d.avgN = Normal3f(-10, -10, -10);
         d.avgP = Point3f(-100, -100, -100);
-        m_tree[i].SetData(d);
+        mTree[i].SetData(d);
     }
 
     mTree.Build(true);
@@ -144,6 +145,24 @@ std::tuple<Point3f, Normal3f, size_t> ConstraintKDTree::CalcAvgValues(TreeNode &
     return std::make_tuple(avgP, avgN, allSamples);
 }
 
+std::tuple<std::vector<Point3f>, std::vector<Normal3f>, std::vector<Float>>
+ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
+                                 const std::function<Float(Float, Float)> &kernel) const {
+    // Extract constraints from KD Tree by traversing from the top
+    std::vector<Point3f> positions;
+    std::vector<Normal3f> normals;
+    std::vector<Float> sampleWeights;
+    GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
+
+    // Add the super constraints
+    for (size_t i = 0; i < mPoints.size(); ++i) {
+        positions.push_back(mPoints[i]);
+        normals.push_back(mNormals[i]);
+        sampleWeights.push_back(-1.0f);
+    }
+    return std::make_tuple(positions, normals, sampleWeights);
+}
+
 void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pbrt::ConstraintKDTree::ExtraData> node,
                                       TreeNode::IndexType index, const Bounds3f &aabb, std::vector<Point3f> &points,
                                       std::vector<Normal3f> &normals, std::vector<Float> &sampleWeights,
@@ -154,8 +173,8 @@ void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pb
         return;
     }
     if (pbrt::DistanceSquared(node.GetData().p, p) < dist2Threshold) {
-        points.push_back(node.GetData().p)
-        normals.push_back(node.GetData().n)
+        points.push_back(node.GetData().p);
+        normals.push_back(node.GetData().n);
         sampleWeights.push_back(1.0f);
     }
 
@@ -193,13 +212,13 @@ Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
     Float sigmaSp = (1 - g) * sigmaS;
     Float sigmaTp = sigmaSp + sigmaa;
     Float alphaP = sigmaSp / sigmaTp;
-    Float effAlphaP = pbrt::effectiveAlbedo(alphaP);
+    Float effAlphaP = pbrt::EffectiveAlbedo(alphaP);
     Float val = 0.25f * g + 0.25 * alphaP + 1.0 * effAlphaP;
     return kernelMultiplier * 4.0f * val * val / (sigmaTp * sigmaTp);
 }
 
-std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
-PolyUtils::FitPolynomial(const PolyUtils::PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
+std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
+PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
     if (polyFitRecord.config.hardSurfaceConstraint) {
         if (polyFitRecord.config.order == 2) {
             return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
@@ -211,10 +230,9 @@ PolyUtils::FitPolynomial(const PolyUtils::PolyFitRecord &polyFitRecord, const Co
     }
 }
 
-template<size_t polyOrder, bool hardSurfaceConstraint = true>
-static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Vector3f>>
-PolyUtils::FitPolynomialImpl(const PolyUtils::PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
-    // TODO: Fit polynomial
+template<size_t polyOrder, bool hardSurfaceConstraint>
+std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
+PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
     Float kernelEps = pfRec.kernelEps;
     std::function<Float(Float, Float)> kernelFunc = PolyUtils::GaussianKernel;
     std::vector<Point3f> posConstraints;
@@ -228,10 +246,11 @@ PolyUtils::FitPolynomialImpl(const PolyUtils::PolyFitRecord &pfRec, const Constr
 
     Eigen::VectorXf weights(n);
     Vector3f s, t;
-    OnbDuff(pfRec.d, s, t);
+    Normal3f pfd = (Normal3f) pfRec.d;
+    OnbDuff(pfd, s, t);
 
-    PolyUtils::Frame local(s, t, pfRec.d);
-    bool &&useLightspace = pfRec.config.useLightspace;
+    PolyUtils::Frame local(s, t, pfd);
+    bool useLightspace = pfRec.config.useLightspace;
 
     for (size_t i = 0; i < n; i++) {
         Float d2 = DistanceSquared(pfRec.p, posConstraints[i]), w;
@@ -252,7 +271,7 @@ PolyUtils::FitPolynomialImpl(const PolyUtils::PolyFitRecord &pfRec, const Constr
     for (size_t i = 0; i < n; i++) {
         Normal3f normal = normConstraints[i];
         if (useLightspace) {
-            normal = local.toLocal(normal);
+            normal = (Normal3f) local.toLocal((Vector3f) normal);
         }
         weightedB[i] = 0.0f;
         weightedB[i + 1 * n] = normal.x * weights[i];
@@ -270,121 +289,52 @@ PolyUtils::FitPolynomialImpl(const PolyUtils::PolyFitRecord &pfRec, const Constr
     Eigen::Matrix<float, nCoeffs, nCoeffs> AtA(nCoeffs, nCoeffs);
     // This scale factor seems to lead to a well behaved fit in many different settings
     float fitScaleFactor = PolyUtils::GetFitScaleFactor(kernelEps);
-    Vector3f usedRefDir = useLightSpace ? local.toLocal(pfRec.n) : pfRec.n;
+    Vector3f usedRefDir = useLightspace ? local.toLocal((Vector3f) pfRec.n) : (Vector3f) pfRec.n;
 
-    if (useLightSpace) {
-        basisFunFitBuildA<polyOrder, hardSurfaceConstraint>(Point3f(0.0f), usedRefDir, positionConstraints,
+    if (useLightspace) {
+        basisFunFitBuildA<polyOrder, hardSurfaceConstraint>(Point3f(), usedRefDir, posConstraints,
                                                             pX, pY, pZ, &weights, A, weightedB, fitScaleFactor);
     } else {
-        basisFunFitBuildA<polyOrder, hardSurfaceConstraint>(pfRec.p, usedRefDir, positionConstraints, pX, pY, pZ,
+        basisFunFitBuildA<polyOrder, hardSurfaceConstraint>(pfRec.p, usedRefDir, posConstraints, pX, pY, pZ,
                                                             &weights, A, weightedB, fitScaleFactor);
     }
     Eigen::Matrix<float, nCoeffs, 1> Atb = A.transpose() * weightedB;
 
-
-}
-
-template<int order, typename T>
-static Eigen::Matrix<float, nPolyCoeffs(order), 1> PolyUtils::RotatePolynomialEigen(
-        const T &c,
-        const Vector3f &s,
-        const Vector3f &t,
-        const Normal3f &n) {
-    Eigen::Matrix<float, nPolyCoeffs(order), 1> c2;
-    c2[0] = c[0];
-    c2[1] = c[1] * s[0] + c[2] * s[1] + c[3] * s[2];
-    c2[2] = c[1] * t[0] + c[2] * t[1] + c[3] * t[2];
-    c2[3] = c[1] * n[0] + c[2] * n[1] + c[3] * n[2];
-    c2[4] = c[4] * powi(s[0], 2) + c[5] * s[0] * s[1] + c[6] * s[0] * s[2] + c[7] * powi(s[1], 2) + c[8] * s[1] * s[2] +
-            c[9] * powi(s[2], 2);
-    c2[5] = 2 * c[4] * s[0] * t[0] + c[5] * (s[0] * t[1] + s[1] * t[0]) + c[6] * (s[0] * t[2] + s[2] * t[0]) +
-            2 * c[7] * s[1] * t[1] + c[8] * (s[1] * t[2] + s[2] * t[1]) + 2 * c[9] * s[2] * t[2];
-    c2[6] = 2 * c[4] * n[0] * s[0] + c[5] * (n[0] * s[1] + n[1] * s[0]) + c[6] * (n[0] * s[2] + n[2] * s[0]) +
-            2 * c[7] * n[1] * s[1] + c[8] * (n[1] * s[2] + n[2] * s[1]) + 2 * c[9] * n[2] * s[2];
-    c2[7] = c[4] * powi(t[0], 2) + c[5] * t[0] * t[1] + c[6] * t[0] * t[2] + c[7] * powi(t[1], 2) + c[8] * t[1] * t[2] +
-            c[9] * powi(t[2], 2);
-    c2[8] = 2 * c[4] * n[0] * t[0] + c[5] * (n[0] * t[1] + n[1] * t[0]) + c[6] * (n[0] * t[2] + n[2] * t[0]) +
-            2 * c[7] * n[1] * t[1] + c[8] * (n[1] * t[2] + n[2] * t[1]) + 2 * c[9] * n[2] * t[2];
-    c2[9] = c[4] * powi(n[0], 2) + c[5] * n[0] * n[1] + c[6] * n[0] * n[2] + c[7] * powi(n[1], 2) + c[8] * n[1] * n[2] +
-            c[9] * powi(n[2], 2);
-    if (order > 2) {
-        c2[10] = c[10] * powi(s[0], 3) + c[11] * powi(s[0], 2) * s[1] + c[12] * powi(s[0], 2) * s[2] +
-                 c[13] * s[0] * powi(s[1], 2) + c[14] * s[0] * s[1] * s[2] + c[15] * s[0] * powi(s[2], 2) +
-                 c[16] * powi(s[1], 3) + c[17] * powi(s[1], 2) * s[2] + c[18] * s[1] * powi(s[2], 2) +
-                 c[19] * powi(s[2], 3);
-        c2[11] = 3 * c[10] * powi(s[0], 2) * t[0] + c[11] * (powi(s[0], 2) * t[1] + 2 * s[0] * s[1] * t[0]) +
-                 c[12] * (powi(s[0], 2) * t[2] + 2 * s[0] * s[2] * t[0]) +
-                 c[13] * (2 * s[0] * s[1] * t[1] + powi(s[1], 2) * t[0]) +
-                 c[14] * (s[0] * s[1] * t[2] + s[0] * s[2] * t[1] + s[1] * s[2] * t[0]) +
-                 c[15] * (2 * s[0] * s[2] * t[2] + powi(s[2], 2) * t[0]) + 3 * c[16] * powi(s[1], 2) * t[1] +
-                 c[17] * (powi(s[1], 2) * t[2] + 2 * s[1] * s[2] * t[1]) +
-                 c[18] * (2 * s[1] * s[2] * t[2] + powi(s[2], 2) * t[1]) + 3 * c[19] * powi(s[2], 2) * t[2];
-        c2[12] = 3 * c[10] * n[0] * powi(s[0], 2) + c[11] * (2 * n[0] * s[0] * s[1] + n[1] * powi(s[0], 2)) +
-                 c[12] * (2 * n[0] * s[0] * s[2] + n[2] * powi(s[0], 2)) +
-                 c[13] * (n[0] * powi(s[1], 2) + 2 * n[1] * s[0] * s[1]) +
-                 c[14] * (n[0] * s[1] * s[2] + n[1] * s[0] * s[2] + n[2] * s[0] * s[1]) +
-                 c[15] * (n[0] * powi(s[2], 2) + 2 * n[2] * s[0] * s[2]) + 3 * c[16] * n[1] * powi(s[1], 2) +
-                 c[17] * (2 * n[1] * s[1] * s[2] + n[2] * powi(s[1], 2)) +
-                 c[18] * (n[1] * powi(s[2], 2) + 2 * n[2] * s[1] * s[2]) + 3 * c[19] * n[2] * powi(s[2], 2);
-        c2[13] = 3 * c[10] * s[0] * powi(t[0], 2) + c[11] * (2 * s[0] * t[0] * t[1] + s[1] * powi(t[0], 2)) +
-                 c[12] * (2 * s[0] * t[0] * t[2] + s[2] * powi(t[0], 2)) +
-                 c[13] * (s[0] * powi(t[1], 2) + 2 * s[1] * t[0] * t[1]) +
-                 c[14] * (s[0] * t[1] * t[2] + s[1] * t[0] * t[2] + s[2] * t[0] * t[1]) +
-                 c[15] * (s[0] * powi(t[2], 2) + 2 * s[2] * t[0] * t[2]) + 3 * c[16] * s[1] * powi(t[1], 2) +
-                 c[17] * (2 * s[1] * t[1] * t[2] + s[2] * powi(t[1], 2)) +
-                 c[18] * (s[1] * powi(t[2], 2) + 2 * s[2] * t[1] * t[2]) + 3 * c[19] * s[2] * powi(t[2], 2);
-        c2[14] = 6 * c[10] * n[0] * s[0] * t[0] +
-                 c[11] * (2 * n[0] * s[0] * t[1] + 2 * n[0] * s[1] * t[0] + 2 * n[1] * s[0] * t[0]) +
-                 c[12] * (2 * n[0] * s[0] * t[2] + 2 * n[0] * s[2] * t[0] + 2 * n[2] * s[0] * t[0]) +
-                 c[13] * (2 * n[0] * s[1] * t[1] + 2 * n[1] * s[0] * t[1] + 2 * n[1] * s[1] * t[0]) + c[14] *
-                                                                                                      (n[0] * s[1] *
-                                                                                                       t[2] +
-                                                                                                       n[0] * s[2] *
-                                                                                                       t[1] +
-                                                                                                       n[1] * s[0] *
-                                                                                                       t[2] +
-                                                                                                       n[1] * s[2] *
-                                                                                                       t[0] +
-                                                                                                       n[2] * s[0] *
-                                                                                                       t[1] +
-                                                                                                       n[2] * s[1] *
-                                                                                                       t[0]) +
-                 c[15] * (2 * n[0] * s[2] * t[2] + 2 * n[2] * s[0] * t[2] + 2 * n[2] * s[2] * t[0]) +
-                 6 * c[16] * n[1] * s[1] * t[1] +
-                 c[17] * (2 * n[1] * s[1] * t[2] + 2 * n[1] * s[2] * t[1] + 2 * n[2] * s[1] * t[1]) +
-                 c[18] * (2 * n[1] * s[2] * t[2] + 2 * n[2] * s[1] * t[2] + 2 * n[2] * s[2] * t[1]) +
-                 6 * c[19] * n[2] * s[2] * t[2];
-        c2[15] = 3 * c[10] * powi(n[0], 2) * s[0] + c[11] * (powi(n[0], 2) * s[1] + 2 * n[0] * n[1] * s[0]) +
-                 c[12] * (powi(n[0], 2) * s[2] + 2 * n[0] * n[2] * s[0]) +
-                 c[13] * (2 * n[0] * n[1] * s[1] + powi(n[1], 2) * s[0]) +
-                 c[14] * (n[0] * n[1] * s[2] + n[0] * n[2] * s[1] + n[1] * n[2] * s[0]) +
-                 c[15] * (2 * n[0] * n[2] * s[2] + powi(n[2], 2) * s[0]) + 3 * c[16] * powi(n[1], 2) * s[1] +
-                 c[17] * (powi(n[1], 2) * s[2] + 2 * n[1] * n[2] * s[1]) +
-                 c[18] * (2 * n[1] * n[2] * s[2] + powi(n[2], 2) * s[1]) + 3 * c[19] * powi(n[2], 2) * s[2];
-        c2[16] = c[10] * powi(t[0], 3) + c[11] * powi(t[0], 2) * t[1] + c[12] * powi(t[0], 2) * t[2] +
-                 c[13] * t[0] * powi(t[1], 2) + c[14] * t[0] * t[1] * t[2] + c[15] * t[0] * powi(t[2], 2) +
-                 c[16] * powi(t[1], 3) + c[17] * powi(t[1], 2) * t[2] + c[18] * t[1] * powi(t[2], 2) +
-                 c[19] * powi(t[2], 3);
-        c2[17] = 3 * c[10] * n[0] * powi(t[0], 2) + c[11] * (2 * n[0] * t[0] * t[1] + n[1] * powi(t[0], 2)) +
-                 c[12] * (2 * n[0] * t[0] * t[2] + n[2] * powi(t[0], 2)) +
-                 c[13] * (n[0] * powi(t[1], 2) + 2 * n[1] * t[0] * t[1]) +
-                 c[14] * (n[0] * t[1] * t[2] + n[1] * t[0] * t[2] + n[2] * t[0] * t[1]) +
-                 c[15] * (n[0] * powi(t[2], 2) + 2 * n[2] * t[0] * t[2]) + 3 * c[16] * n[1] * powi(t[1], 2) +
-                 c[17] * (2 * n[1] * t[1] * t[2] + n[2] * powi(t[1], 2)) +
-                 c[18] * (n[1] * powi(t[2], 2) + 2 * n[2] * t[1] * t[2]) + 3 * c[19] * n[2] * powi(t[2], 2);
-        c2[18] = 3 * c[10] * powi(n[0], 2) * t[0] + c[11] * (powi(n[0], 2) * t[1] + 2 * n[0] * n[1] * t[0]) +
-                 c[12] * (powi(n[0], 2) * t[2] + 2 * n[0] * n[2] * t[0]) +
-                 c[13] * (2 * n[0] * n[1] * t[1] + powi(n[1], 2) * t[0]) +
-                 c[14] * (n[0] * n[1] * t[2] + n[0] * n[2] * t[1] + n[1] * n[2] * t[0]) +
-                 c[15] * (2 * n[0] * n[2] * t[2] + powi(n[2], 2) * t[0]) + 3 * c[16] * powi(n[1], 2) * t[1] +
-                 c[17] * (powi(n[1], 2) * t[2] + 2 * n[1] * n[2] * t[1]) +
-                 c[18] * (2 * n[1] * n[2] * t[2] + powi(n[2], 2) * t[1]) + 3 * c[19] * powi(n[2], 2) * t[2];
-        c2[19] = c[10] * powi(n[0], 3) + c[11] * powi(n[0], 2) * n[1] + c[12] * powi(n[0], 2) * n[2] +
-                 c[13] * n[0] * powi(n[1], 2) + c[14] * n[0] * n[1] * n[2] + c[15] * n[0] * powi(n[2], 2) +
-                 c[16] * powi(n[1], 3) + c[17] * powi(n[1], 2) * n[2] + c[18] * n[1] * powi(n[2], 2) +
-                 c[19] * powi(n[2], 3);
+    Eigen::VectorXf coeffs;
+    if (pfRec.config.useSvd) {
+        Eigen::MatrixXf ADyn = A;
+        Eigen::BDCSVD<Eigen::MatrixXf> svd = ADyn.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
+        const Eigen::VectorXf &sVal = svd.singularValues();
+        float eps = 0.01f;
+        coeffs = svd.matrixV() * ((sVal.array() > eps).select(sVal.array().inverse(), 0)).matrix().asDiagonal() *
+                 svd.matrixU().transpose() * weightedB;
+    } else {
+        Eigen::MatrixXf reg = Eigen::MatrixXf::Identity(A.cols(), A.cols()) * pfRec.config.regularization;
+        reg(0, 0) = 0.0f;
+        reg(1, 1) = 0.0f;
+        reg(2, 2) = 0.0f;
+        AtA = A.transpose() * A + reg;
+        coeffs = AtA.ldlt().solve(Atb);
     }
-    return c2;
+
+    std::vector<Float> coeffsVec(NumPolynomialCoefficients(polyOrder));
+    if (hardSurfaceConstraint) {
+        coeffsVec[0] = 0.0f;
+        for (size_t i = 1; i < coeffs.size(); ++i)
+            coeffsVec[i] = coeffs[i - 1];
+    } else {
+        for (size_t i = 0; i < coeffs.size(); ++i)
+            coeffsVec[i] = coeffs[i];
+    }
+
+    PolyUtils::Polynomial poly;
+    poly.coeffs = coeffsVec;
+    poly.refPos = pfRec.p;
+    poly.refDir = pfRec.d;
+    poly.useLocalDir = pfRec.config.useLightspace;
+    poly.scaleFactor = PolyUtils::GetFitScaleFactor(kernelEps);
+    poly.order = polyOrder;
+    return std::make_tuple(poly, posConstraints, normConstraints);
 }
 
 const static int PERMX2[10] = {1, 4, 5, 6, -1, -1, -1, -1, -1, -1};

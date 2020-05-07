@@ -34,6 +34,7 @@
 // core/shape.cpp*
 #include "shape.h"
 #include "stats.h"
+#include "transform.h"
 #include "lowdiscrepancy.h"
 
 namespace pbrt {

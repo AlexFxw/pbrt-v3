@@ -18,7 +18,7 @@ public:
                 const pbrt::Spectrum &albedo, float g, float eta, const std::string &modelName,
                 const std::string &absModelName, const std::string &angularModelName,
                 const std::string &outputDir, int batchSize,
-                const pbrt::PolyUtils::PolyFitConfig &pfConfig) override;
+                const pbrt::PolyUtils::PolyFitConfig &pfConfig);
     virtual ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
                                          const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
                                          const Spectrum &albedo, float g, float eta, Sampler &sampler,

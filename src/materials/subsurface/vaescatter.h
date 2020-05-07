@@ -16,8 +16,9 @@ namespace pbrt {
 
 class VaeScatter : public BSSRDF {
 public:
-    VaeScatter();  // TODO: implement
-    VaeScatter(const SurfaceInteraction &po, Float eta) : BSSRDF(po, eta) {}
+    VaeScatter(const SurfaceInteraction &po, Float eta) : BSSRDF(po, eta) {
+        mVaeHandler = nullptr;
+    }
 
     ~VaeScatter();
     Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) override;
