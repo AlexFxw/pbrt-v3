@@ -23,11 +23,18 @@ public:
                   const std::shared_ptr<Texture<Float>> &bumpMap,
                   bool remapRoughness) :
             SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s,
-                               g, eta, uRoughness, vRoughness, bumpMap, remapRoughness) {}
+                               g, eta, uRoughness, vRoughness, bumpMap, remapRoughness), mVaeHandler(nullptr) {}
 
 
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,
-                                    TransportMode mode, bool allowMultipleLobes) const;
+                                    TransportMode mode, bool allowMultipleLobes) const override;
+
+    void PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes,
+                         const ParamSet &params) override;
+
+    friend VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp);
+protected:
+    std::shared_ptr<VaeHandler> mVaeHandler;
 
 };
 

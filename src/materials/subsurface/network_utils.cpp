@@ -23,8 +23,8 @@ void NetworkUtils::onb(const Eigen::Vector3f &n, Eigen::Vector3f &b1, Eigen::Vec
 Eigen::VectorXf NetworkUtils::LoadVectorDynamic(const std::string &filename) {
     std::ifstream f(filename, std::ios::binary);
     if (!f.is_open())
-        std::cout << "FILE NOT FOUND: " << filename << std::endl;
-    std::cout << "Loading " << filename << std::endl;
+        LOG(ERROR) << "FILE NOT FOUND: " << filename;
+    LOG(INFO) << "Loading " << filename << std::endl;
     int32_t nDims;
     f.read(reinterpret_cast<char *>(&nDims), sizeof(nDims));
     int32_t size;

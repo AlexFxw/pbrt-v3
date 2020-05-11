@@ -54,7 +54,10 @@ struct SimpleKDNode {
     }
 
 
-    void SetRightIndex(IndexType self, IndexType value) { right = value; }
+    void SetRightIndex(IndexType self, IndexType value) {
+        CHECK_NE(self, value);
+        right = value;
+    }
 
     // Get the split axis of this node.
     uint16_t GetAxis() const { return flags & (uint8_t) EAxisMask; }
@@ -144,13 +147,14 @@ public:
         NodeType &splitNode = mNodes[*split];
         splitNode.SetAxis(axis);
         splitNode.SetLeaf(false);
-        if (split + 1 != rangeEnd) {
+        if (split + 1 != rangeEnd && split != rangeStart) {
             splitNode.SetRightIndex((IndexType) (rangeStart - base), (IndexType) (split + 1 - base));
         } else {
             splitNode.SetRightIndex((IndexType) (rangeStart - base), 0);
         }
         // TODO: Set left
 
+        std::iter_swap(rangeStart, split);
         Float tmp = mAABB.pMax[axis], splitPos = splitNode.pos[axis];
         mAABB.pMax[axis] = splitPos;
         BuildImpl(depth + 1, base, rangeStart + 1, split + 1);

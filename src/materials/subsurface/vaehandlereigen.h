@@ -14,12 +14,13 @@ namespace pbrt {
 
 class VaeHandlerEigen : public VaeHandler {
 public:
-    VaeHandlerEigen(Float kernelEpsScale);
-    int Prepare(const pbrt::Scene *scene, const std::vector<Shape *> &shapes, const pbrt::Spectrum &sigmaT,
-                const pbrt::Spectrum &albedo, float g, float eta, const std::string &modelName,
-                const std::string &absModelName, const std::string &angularModelName,
-                const std::string &outputDir, int batchSize,
-                const pbrt::PolyUtils::PolyFitConfig &pfConfig);
+    VaeHandlerEigen(const Spectrum &sigmaT,
+                    const Spectrum &albedo, float g, float eta, const std::string &modelName,
+                    const std::string &absModelName, const std::string &angularModelName,
+                    const std::string &outputDir, int batchSize, Float kernelEpsScale);
+
+    int Prepare(const std::vector<std::shared_ptr<Shape>> &shapes,
+                const PolyUtils::PolyFitConfig &pfConfig) override;
 
     ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
                                  const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
@@ -27,10 +28,12 @@ public:
                                  const Interaction &isect, bool projectSamples, int channel) const override;
 
 private:
-    AbsorptionModel<3> absModel; // TODO: initialize
-    std::unique_ptr<ScatterModelBase> scatterModel;
+    std::unique_ptr<ScatterModelBase<3>> scatterModel;
+    std::unique_ptr<FeatureModel<3>> featureModel;
+    std::unique_ptr<AbsorptionModel<3>> absorptionModel;
     Spectrum mEffectiveAlbedo;
     Float mKernelEpsScale;
+    std::string mAbsVariableDir, mScatterVariableDir;
 };
 
 }

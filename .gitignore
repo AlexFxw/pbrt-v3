@@ -12,3 +12,5 @@ src/ext/tensorflow
 *.exr
 *.DS_Store
 scenes/dragon
+scenes/cornell_box.pbrt
+data

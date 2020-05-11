@@ -127,12 +127,14 @@ std::tuple<Point3f, Normal3f, size_t> ConstraintKDTree::CalcAvgValues(TreeNode &
     size_t rSamples = 0, lSamples = 0;
     if (mTree.HasRightChild(index)) {
         auto rightIdx = node.GetRightIndex(index);
-        std::tie(rp, rn, rSamples) = CalcAvgValues(mTree[rightIdx], rightIdx);
+        if (index != rightIdx)
+            std::tie(rp, rn, rSamples) = CalcAvgValues(mTree[rightIdx], rightIdx);
     }
 
     if (!node.IsLeaf()) {
         auto leftIdx = node.GetLeftIndex(index);
-        std::tie(lp, ln, lSamples) = CalcAvgValues(mTree[leftIdx], leftIdx);
+        if (index != leftIdx)
+            std::tie(lp, ln, lSamples) = CalcAvgValues(mTree[leftIdx], leftIdx);
     }
 
     size_t allSamples = lSamples + rSamples + 1;
@@ -193,12 +195,14 @@ void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pb
     Bounds3f rightBounds(rightMin, rightMax);
     if (mTree.HasRightChild(index)) {
         auto rightIdx = node.GetRightIndex(index);
-        GetConstraints(p, mTree[rightIdx], rightIdx, rightBounds, points, normals, sampleWeights, kernelEps,
-                       kernelFunc);
+        if (rightIdx != index)
+            GetConstraints(p, mTree[rightIdx], rightIdx, rightBounds, points, normals, sampleWeights, kernelEps,
+                           kernelFunc);
     }
     // Node always has left child by construction
     auto leftIdx = node.GetLeftIndex(index);
-    GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
+    if(leftIdx != index)
+        GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
 }
 
 Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
@@ -227,6 +231,7 @@ PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDT
         }
     } else {
         LOG(ERROR) << "Polynomial without hard surface constraint is unsupported.";
+        exit(1);
     }
 }
 

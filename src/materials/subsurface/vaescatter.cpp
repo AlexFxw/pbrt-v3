@@ -9,34 +9,13 @@
 #include "vaescatter.h"
 #include "reflection.h"
 #include "vaehandlereigen.h"
+#include "sampler.h"
 #include "stats.h"
 
 namespace pbrt {
 
 
 VaeScatter::~VaeScatter() {
-    if (mVaeHandler)
-        delete mVaeHandler;
-}
-
-void VaeScatter::Prepare(const Scene *scene, const std::vector<std::shared_ptr<Shape>> &shapes) {
-    DCHECK_EQ(mTriangles.size(), 0);
-    DCHECK_GT(shapes.size(), 0);
-    for (int i = 0; i < shapes.size(); i++) {
-        mTriangles.push_back(shapes[i]);
-    }
-    // FIXME: set appropriate values
-    Float kernelEpsScale = 0.5f;
-    mVaeHandler = new VaeHandlerEigen(kernelEpsScale);
-    PolyUtils::PolyFitConfig pfConfig;
-    std::string modelName = "";
-    std::string absModelName = "";
-    std::string angularModelName = "";
-    std::string outputDir = "";
-    int sssSamples = 300;
-    mVaeHandler->Prepare(scene, shapes, mSigmaT, mAlbedo,
-                         g, eta, modelName, absModelName,
-                         angularModelName, outputDir, sssSamples, pfConfig);
 }
 
 

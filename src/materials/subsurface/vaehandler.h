@@ -21,7 +21,10 @@ namespace pbrt {
 
 class VaeHandler {
 public:
-    VaeHandler() {}
+    VaeHandler(const Spectrum &sigmaT,
+               const Spectrum &albedo, float g, float eta, const std::string &modelName,
+               const std::string &absModelName, const std::string &angularModelName,
+               const std::string &outputDir, int batchSize);
 
     ~VaeHandler() {}
 
@@ -30,11 +33,7 @@ public:
                                          const Spectrum &albedo, float g, float eta, Sampler &sampler,
                                          const Interaction &isect, bool projectSamples, int channel) const = 0;
 
-    virtual int
-    Prepare(const Scene *scene, const std::vector<std::shared_ptr<Shape>> &shapes, const Spectrum &sigmaT,
-            const Spectrum &albedo, float g, float eta, const std::string &modelName,
-            const std::string &absModelName, const std::string &angularModelName,
-            const std::string &outputDir, int batchSize, const PolyUtils::PolyFitConfig &pfConfig);
+    virtual int Prepare(const std::vector<std::shared_ptr<Shape>> &shapes, const PolyUtils::PolyFitConfig &pfConfig);
 
     void PrecomputePolynomials(const std::vector<std::shared_ptr<Shape>> &shapes, const MediumParameters &mediumPara,
                                const PolyUtils::PolyFitConfig &pfConfig);
@@ -50,9 +49,9 @@ public:
         const float *coeffs = its.GetPolyCoeffs(channel);
         Transform transf = AzimuthSpaceTransform(-d, polyNormal);
         const Matrix4x4 &m = transf.GetMatrix();
-        Vector3f s(m(0, 0), m(0, 1), m(0,2));
-        Vector3f t(m(1, 0), m(1, 1), m(1,2));
-        Normal3f n(m(2, 0), m(2, 1), m(2,2));
+        Vector3f s(m(0, 0), m(0, 1), m(0, 2));
+        Vector3f t(m(1, 0), m(1, 1), m(1, 2));
+        Normal3f n(m(2, 0), m(2, 1), m(2, 2));
         Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> shapeCoeffs =
                 PolyUtils::RotatePolynomialEigen<PolyOrder>(coeffs, s, t, n);
         return std::make_pair(shapeCoeffs, transf);
@@ -60,16 +59,19 @@ public:
 
 
 protected:
-    Sampler *mSampler; // TODO: Initialize
     VaeConfig mConfig;
     std::vector<std::vector<ConstraintKDTree>> mKDTrees;
+    std::string mModelName;
     size_t mBatchSize;
     int mPolyOrder;
     MediumParameters mAvgMedium;
 
+private:
     static void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2);
     static Transform AzimuthSpaceTransform(const Vector3f &lightDir, const Normal3f &normal);
     static std::shared_ptr<TriangleMesh> PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes);
+
+
 
 };
 

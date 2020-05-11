@@ -1,8 +1,6 @@
-//
-// Created by 范軒瑋 on 2020/5/5.
-//
-
 #include "vaesubsurface.h"
+#include "vaehandler.h"
+#include "vaehandlereigen.h"
 #include "vaescatter.h"
 #include "texture.h"
 #include "paramset.h"
@@ -15,12 +13,11 @@ void VAESubsurface::ComputeScatteringFunctions(SurfaceInteraction *si, MemoryAre
     // TODO
     // Use the BSDF of subsurface material, but replace the bssrdf with vae scattering function implementation.
     SubsurfaceMaterial::ComputeScatteringFunctions(si, arena, mode, allowMultipleLobes);
-    si->bssrdf = ARENA_ALLOC(arena,VaeScatter)(*si, eta);
+    si->bssrdf = ARENA_ALLOC(arena, VaeScatter)(*si, eta, this->mVaeHandler);
 }
 
-VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp)
-{
-    // TODO: Create a vae subsurface material
+VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
+    // Reuse CreateSubsurfaceMaterial code.
     Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
             sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
@@ -28,6 +25,7 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp)
     std::string name = mp.FindString("name");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
     Float g = mp.FindFloat("g", 0.0f);
+    Float kernelEpsScale = mp.FindFloat("kernelEpsScale", 1.0f);
     if (name != "") {
         if (!found)
             Warning("Named material \"%s\" not found.  Using defaults.",
@@ -53,8 +51,29 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp)
     std::shared_ptr<Texture<Float>> bumpMap =
             mp.GetFloatTextureOrNull("bumpmap");
     bool remapRoughness = mp.FindBool("remaproughness", true);
-    return new VAESubsurface(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
-                                  roughu, roughv, bumpMap, remapRoughness);
+    VAESubsurface *vaeSubsurface = new VAESubsurface(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
+                                                     roughu, roughv, bumpMap, remapRoughness);
+    // FIXME: Configure sigmaT, albedo, etc better
+    Float rgb[3] = {52.02, 78.54, 109.12};
+    Spectrum sigmaT = Spectrum::FromRGB(rgb);
+    Spectrum albedo(0.99f);
+
+    std::string modelName = mp.FindString("model_name", "0487_FinalSharedLs7Mixed3_AbsSharedSimComplexMixed3");
+    std::string absModelName = modelName;
+    std::string outputDir = "data/";
+
+    vaeSubsurface->mVaeHandler = std::make_shared<VaeHandlerEigen>(
+            sigmaT, albedo, g, eta, modelName, absModelName, absModelName, outputDir, 64, kernelEpsScale
+    );
+    return vaeSubsurface;
+}
+
+void VAESubsurface::PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes,
+                                    const ParamSet &params) {
+    Material::PrepareMaterial(shapes, params);
+    PolyUtils::PolyFitConfig pfConfig; // FIXME: I just use default here, remember to make use of params
+    mVaeHandler->Prepare(shapes, pfConfig);
+    LOG(INFO) << "Finish preparing the material.";
 }
 
 

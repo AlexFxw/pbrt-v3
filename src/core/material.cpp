@@ -57,7 +57,7 @@ void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
     if (du == 0) du = .0005f;
     siEval.p = si->p + du * si->shading.dpdu;
     siEval.uv = si->uv + Vector2f(du, 0.f);
-    siEval.n = Normalize((Normal3f)Cross(si->shading.dpdu, si->shading.dpdv) +
+    siEval.n = Normalize((Normal3f) Cross(si->shading.dpdu, si->shading.dpdv) +
                          du * si->dndu);
     Float uDisplace = d->Evaluate(siEval);
 
@@ -66,7 +66,7 @@ void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
     if (dv == 0) dv = .0005f;
     siEval.p = si->p + dv * si->shading.dpdv;
     siEval.uv = si->uv + Vector2f(0.f, dv);
-    siEval.n = Normalize((Normal3f)Cross(si->shading.dpdu, si->shading.dpdv) +
+    siEval.n = Normalize((Normal3f) Cross(si->shading.dpdu, si->shading.dpdv) +
                          dv * si->dndv);
     Float vDisplace = d->Evaluate(siEval);
     Float displace = d->Evaluate(*si);
@@ -80,6 +80,13 @@ void Material::Bump(const std::shared_ptr<Texture<Float>> &d,
                     displace * Vector3f(si->shading.dndv);
     si->SetShadingGeometry(dpdu, dpdv, si->shading.dndu, si->shading.dndv,
                            false);
+}
+
+void Material::PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes,
+                               const ParamSet &params) {
+    // Do nothing if the material behavior is not dependent on geometry information.
+    // In most cases, leave this function blank and there is no need to override it.
+    // In few cases, like Vae scattering material, it may used the shapes info to sample, so you need to override this function.
 }
 
 }  // namespace pbrt

@@ -58,9 +58,9 @@ public:
         std::string featStatsFilePath = outputDir + "/datasets/" + datasetName + "/train/data_stats.json";
         std::ifstream inStreamStats(featStatsFilePath);
         if (inStreamStats) {
-            std::cout << "Loading statistics...\n";
-
+            LOG(INFO) << "Loading statistics...";
             inStreamStats >> stats;
+            LOG(INFO) << "Finish loading.";
         } else {
             std::cout << "STATS NOT FOUND " << featStatsFilePath << std::endl;
         }

@@ -16,8 +16,9 @@ namespace pbrt {
 
 class VaeScatter : public BSSRDF {
 public:
-    VaeScatter(const SurfaceInteraction &po, Float eta) : BSSRDF(po, eta) {
-        mVaeHandler = nullptr;
+    VaeScatter(const SurfaceInteraction &po, Float eta,
+               const std::shared_ptr<VaeHandler> &vaeHandler) : BSSRDF(po, eta) {
+        mVaeHandler = vaeHandler;
     }
 
     ~VaeScatter();
@@ -25,12 +26,12 @@ public:
     Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                       MemoryArena &arena, SurfaceInteraction *si,
                       Float *pdf) const override;
-    void Prepare(const Scene *scene, const std::vector<std::shared_ptr<Shape>> &shapes);
     void Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, const SurfaceInteraction &itact,
                    const Vector3f &w, Sampler &sampler, int nSamples) const;
     Spectrum Sample_Sp(const Scene &scene, ScatterSamplingRecord *sRecs, Float *pdf, int nSamples) const;
+
 private:
-    VaeHandler *mVaeHandler;
+    mutable std::shared_ptr<VaeHandler> mVaeHandler;
     std::vector<std::shared_ptr<Shape>> mTriangles;
     // TODO: Initialize those member variables.
     Float eta, g;

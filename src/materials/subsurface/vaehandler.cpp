@@ -10,26 +10,20 @@
 #include "geometry.h"
 #include "transform.h"
 #include "sampling.h"
-#include "samplers/halton.h"
 #include "shapes/triangle.h"
 #include "network_utils.h"
+#include <random>
+#include <ctime>
 
 namespace pbrt {
 
-int VaeHandler::Prepare(const pbrt::Scene *scene, const std::vector<std::shared_ptr<Shape>> &shapes,
-                        const pbrt::Spectrum &sigmaT,
-                        const pbrt::Spectrum &albedo, float g, float eta, const std::string &modelName,
-                        const std::string &absModelName, const std::string &angularModelName,
-                        const std::string &outputDir, int batchSize, const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
+VaeHandler::VaeHandler(const Spectrum &sigmaT, const Spectrum &albedo, float g, float eta, const std::string &modelName,
+                       const std::string &absModelName, const std::string &angularModelName,
+                       const std::string &outputDir, int batchSize) {
     mBatchSize = batchSize;
     MediumParameters mediumParas(albedo, g, eta, sigmaT);
     mAvgMedium = mediumParas;
-    if (modelName == "None") {
-        // Dont load any ML models
-        mPolyOrder = pfConfig.order;
-        PrecomputePolynomials(shapes, mediumParas, pfConfig);
-        return true;
-    }
+    mModelName = modelName;
     std::string modelPath = outputDir + "models/" + modelName + "/";
     std::string absModelPath = outputDir + "models_abs/" + absModelName + "/";
     std::string angularModelPath = outputDir + "models_angular/" + angularModelName + "/";
@@ -38,13 +32,25 @@ int VaeHandler::Prepare(const pbrt::Scene *scene, const std::vector<std::shared_
 
     mConfig = VaeConfig(configFile, angularModelName != "None" ? angularConfigFile : "", outputDir);
     mPolyOrder = mConfig.polyOrder;
-    PrecomputePolynomials(shapes, mediumParas, pfConfig);
-    return true;
+}
+
+int VaeHandler::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes, const PolyUtils::PolyFitConfig &pfConfig) {
+    LOG(INFO) << "Preparing the vaehandler";
+    if (mModelName == "None") {
+        // Dont load any ML models
+        mPolyOrder = pfConfig.order;
+        PrecomputePolynomials(shapes, mAvgMedium, pfConfig);
+        return 0;
+    }
+
+    PrecomputePolynomials(shapes, mAvgMedium, pfConfig);
+    return 0;
 }
 
 void VaeHandler::PrecomputePolynomials(const std::vector<std::shared_ptr<Shape>> &shapes,
                                        const pbrt::MediumParameters &mediumPara,
                                        const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
+    LOG(INFO) << "Precompute the polynomials";
     mKDTrees.push_back(std::vector<ConstraintKDTree>());
     if (mediumPara.isRgb()) {
         mKDTrees.push_back(std::vector<ConstraintKDTree>());
@@ -62,16 +68,18 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
                                            const pbrt::MediumParameters &mediumPara,
                                            const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
     // TODO: Modify the implementation. Use primitives or shapes?
+    std::default_random_engine randomEngine(time(NULL));
+    std::uniform_real_distribution<Float> unif(0.0, 1.0);
     // 1. Sampling max{1024, 2\sigma_n^2 * SurfaceArea} points around the neighborhood.
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
     std::shared_ptr<TriangleMesh> triMesh = PreprocessTriangles(shapes);
-    int nSamples = std::max(int(triMesh->Area() * 2.0f / kernelEps), 1024);
+    int nSamples = std::min(int(triMesh->Area() * 2.0f / kernelEps), 1024);
     std::vector<Point3f> sampledP;
     std::vector<Normal3f> sampledN;
     for (int i = 0; i < nSamples; i++) {
         Float pdf;
-        size_t trigIdx = triMesh->areaDistri->SampleDiscrete(mSampler->Get1D());
-        Interaction isect = shapes[trigIdx]->Sample(mSampler->Get2D(), &pdf);
+        size_t trigIdx = triMesh->areaDistri->SampleDiscrete(unif(randomEngine));
+        Interaction isect = shapes[trigIdx]->Sample(Point2f(unif(randomEngine), unif(randomEngine)), &pdf);
         sampledP.push_back(isect.p);
         sampledN.push_back(isect.n);
     }
@@ -86,8 +94,9 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     for (int i = 0; i < triMesh->nVertices; i++) {
         PolyUtils::PolyFitRecord pfRec;
         pfRec.p = triMesh->p[i];
-        pfRec.d = (Vector3f) triMesh->n[i];
-        pfRec.n = triMesh->n[i];
+        // FIXME: Why n is null?
+        pfRec.d = triMesh->n ? (Vector3f) triMesh->n[i] : Vector3f();
+        pfRec.n = triMesh->n ? triMesh->n[i] : Normal3f();
         pfRec.kernelEps = kernelEps;
         pfRec.config = pfConfig;
         pfRec.config.useLightspace = false;

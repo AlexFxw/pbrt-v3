@@ -58,6 +58,8 @@ class Material {
     virtual ~Material();
     static void Bump(const std::shared_ptr<Texture<Float>> &d,
                      SurfaceInteraction *si);
+
+    virtual void PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes, const ParamSet &params);
 };
 
 }  // namespace pbrt
