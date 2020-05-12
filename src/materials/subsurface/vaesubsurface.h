@@ -6,6 +6,7 @@
 #define PBRT_V3_VAESUBSURFACE_H
 
 #include "pbrt.h"
+#include "medium.h"
 #include "materials/subsurface.h"
 
 namespace pbrt {
@@ -35,7 +36,6 @@ public:
     friend VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp);
 protected:
     std::shared_ptr<VaeHandler> mVaeHandler;
-
 };
 
 VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp);

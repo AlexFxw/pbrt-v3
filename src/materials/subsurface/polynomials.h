@@ -418,7 +418,8 @@ public:
 
     static void ProjectPointsToSurface(const Scene *scene, const Point3f &refPoint, const Vector3f &refDir,
                                        ScatterSamplingRecord &rec, const Eigen::VectorXf &polyCoefficients,
-                                       size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps);
+                                       size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps,
+                                       SurfaceInteraction *res);
 
     static Normal3f AdjustRayDirForPolynomialTracing(Vector3f &inDir, const SurfaceInteraction &isect,
                                                      int polyOrder, Float polyScaleFactor, int channel);

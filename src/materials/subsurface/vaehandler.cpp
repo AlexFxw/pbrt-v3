@@ -72,7 +72,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     std::uniform_real_distribution<Float> unif(0.0, 1.0);
     // 1. Sampling max{1024, 2\sigma_n^2 * SurfaceArea} points around the neighborhood.
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
-    std::shared_ptr<TriangleMesh> triMesh = PreprocessTriangles(shapes);
+    std::shared_ptr<TriangleMesh> triMesh(PreprocessTriangles(shapes));
     int nSamples = std::min(int(triMesh->Area() * 2.0f / kernelEps), 1024);
     std::vector<Point3f> sampledP;
     std::vector<Normal3f> sampledN;
@@ -124,8 +124,9 @@ std::shared_ptr<TriangleMesh> VaeHandler::PreprocessTriangles(const std::vector<
         areas[i] = shapes[i]->Area();
         areaSum += areas[i];
     }
-    std::shared_ptr<Triangle> triangleIter = std::dynamic_pointer_cast<Triangle>(shapes.back());
-    std::shared_ptr<TriangleMesh> triMesh = triangleIter->mesh;
+    auto tmp = shapes.back();
+    std::shared_ptr<Triangle> triangleIter(std::dynamic_pointer_cast<Triangle>(shapes.back()));
+    std::shared_ptr<TriangleMesh> triMesh(triangleIter->mesh);
     triMesh->areaDistri = new Distribution1D(areas, shapesNum);
     triMesh->area = areaSum;
     triMesh->invArea = 1.0f / areaSum;

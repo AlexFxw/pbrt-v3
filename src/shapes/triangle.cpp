@@ -354,6 +354,17 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
                                 Normal3f(0, 0, 0), Normal3f(0, 0, 0), ray.time,
                                 this, faceIndex);
 
+    if(this->mesh->poly)
+    {
+        // Initialized and it uses vae here.
+        // TODO: Vae: Add the poly storage info here.
+        const PolyStorage &poly0 = mesh->poly[v[0]];
+        const PolyStorage &poly1 = mesh->poly[v[1]];
+        const PolyStorage &poly2 = mesh->poly[v[2]];
+        PolyStorage hitPoly = poly0 * b0 + poly1 * b1 + poly2 * b2;
+        isect->polyStorage = new PolyStorage(hitPoly);
+    }
+
     // Override surface normal in _isect_ for triangle
     isect->n = isect->shading.n = Normal3f(Normalize(Cross(dp02, dp12)));
     if (reverseOrientation ^ transformSwapsHandedness)

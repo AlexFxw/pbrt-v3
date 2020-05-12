@@ -49,11 +49,7 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Triangle meshes", triMeshBytes);
 
-struct PolyStorage {
-    float coeffs[3][20];
-    float kernelEps[3];
-    size_t nPolyCoeffs = 20;
-};
+
 
 // Triangle Declarations
 struct TriangleMesh {
@@ -73,7 +69,7 @@ struct TriangleMesh {
     std::unique_ptr<Vector3f[]> s;
     std::unique_ptr<Point2f[]> uv;
     std::shared_ptr<Texture<Float>> alphaMask, shadowAlphaMask;
-    PolyStorage *poly;
+    PolyStorage *poly = nullptr;
     std::vector<int> faceIndices;
     Distribution1D *areaDistri = nullptr;
     Float area = 0.0f, invArea = 0.0f;
@@ -132,15 +128,6 @@ private:
             uv[1] = Point2f(1, 0);
             uv[2] = Point2f(1, 1);
         }
-    }
-
-    int GetPolyStorage(PolyStorage poly[3]) const {
-        if (mesh->poly)
-            for (int i = 0; i < 3; i++)
-                poly[i] = mesh->poly[v[i]];
-        else
-            return 1;
-        return 0;
     }
 
     // Triangle Private Data

@@ -24,8 +24,8 @@ public:
 
     ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
                                  const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
-                                 const Spectrum &albedo, float g, float eta, Sampler &sampler,
-                                 const Interaction &isect, bool projectSamples, int channel) const override;
+                                 const Spectrum &albedo, float g, float eta, const SurfaceInteraction &isect,
+                                 bool projectSamples, int channel, SurfaceInteraction *res) const override;
 
 private:
     std::unique_ptr<ScatterModelBase<3>> scatterModel;

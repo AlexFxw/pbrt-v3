@@ -368,14 +368,17 @@ std::pair<float, Vector3f> EvalPolyGrad(const Point3f &pos,
                                         const int *permX, const int *permY, const int *permZ,
                                         Float scaleFactor, bool useLocalDir, const Vector3f &refDir,
                                         const T &coeffs) {
+    // FIXME: Donot use evalP here.
     Vector3f relPos;
     if (useLocalDir) {
         Vector3f s, t;
         PolyUtils::OnbDuff(Normal3f(refDir), s, t);
         PolyUtils::Frame local(s, t, Normal3f(refDir));
-        relPos = local.toLocal(evalP - pos) * scaleFactor;
+        // relPos = local.toLocal(evalP - pos) * scaleFactor;
+        relPos = local.toLocal(Vector3f(pos)) * scaleFactor;
     } else {
-        relPos = (evalP - pos) * scaleFactor;
+        // relPos = (evalP - pos) * scaleFactor;
+        relPos = Vector3f(pos) * scaleFactor;
     }
 
     size_t termIdx = 0;
@@ -412,10 +415,12 @@ std::pair<float, Vector3f> EvalPolyGrad(const Point3f &pos,
 
 void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoint, const Vector3f &refDir,
                                        ScatterSamplingRecord &rec, const Eigen::VectorXf &polyCoefficients,
-                                       size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps) {
+                                       size_t polyOrder, bool useLocalDir, Float scaleFactor, Float kernelEps,
+                                       SurfaceInteraction *res) {
     if (!rec.isValid)
         return;
 
+    // FIXME: Adjust the dir.
     Vector3f dir = EvaluateGradient(refPoint, polyCoefficients, rec, polyOrder, scaleFactor, useLocalDir, refDir);
     Float dists[2] = {2 * kernelEps, std::numeric_limits<Float>::infinity()};
 
@@ -444,6 +449,7 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
         }
         rec.isValid = itsFound;
         if (itsFound) {
+            *res = its;
             rec.p = projectedP;
             rec.n = normal;
             return;
@@ -468,7 +474,8 @@ PolyUtils::EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, c
         PolyUtils::Frame local(s, t, Normal3f(refDir));
         gradient = local.toWorld(gradient);
     }
-    return pbrt::Vector3f();
+    // FIXME: May be bug here.
+    return gradient;
 }
 
 Normal3f PolyUtils::AdjustRayDirForPolynomialTracing(Vector3f &inDir, const SurfaceInteraction &isect, int polyOrder,

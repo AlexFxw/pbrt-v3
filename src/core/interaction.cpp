@@ -41,7 +41,7 @@
 
 namespace pbrt {
 
-const Float *Interaction::GetPolyCoeffs(int channel) const {
+const Float *SurfaceInteraction::GetPolyCoeffs(int channel) const {
     if (polyStorage != nullptr) {
         return (Float *) polyStorage->coeffs[channel];
     }

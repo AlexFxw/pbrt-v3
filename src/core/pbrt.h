@@ -63,6 +63,8 @@
 #include <assert.h>
 #include <string.h>
 #include <glog/logging.h>
+#include <random>
+#include <ctime>
 
 // Platform-specific definitions
 #if defined(_WIN32) || defined(_WIN64)
@@ -628,6 +630,54 @@ void permute_inplace(
     }
 }
 
+inline Float GetRandomFloat() {
+    std::default_random_engine randomEngine(time(NULL));
+    std::uniform_real_distribution<Float> unif(0.0, 1.0);
+    return unif(randomEngine);
+}
+
+struct PolyStorage {
+    float coeffs[3][20];
+    float kernelEps[3];
+    size_t nPolyCoeffs = 20;
+
+    PolyStorage() {}
+
+    PolyStorage(const PolyStorage &poly) {
+        for (int channel = 0; channel < 3; channel++) {
+            kernelEps[channel] = poly.kernelEps[channel];
+            for (size_t i = 0; i < nPolyCoeffs; i++) {
+                coeffs[channel][i] = poly.coeffs[channel][i];
+            }
+        }
+        nPolyCoeffs = poly.nPolyCoeffs;
+    }
+
+    PolyStorage operator+(const PolyStorage &poly) const {
+        PolyStorage res;
+        DCHECK_EQ(this->nPolyCoeffs, poly.nPolyCoeffs);
+        for(int channel = 0; channel < 3; channel ++) {
+            res.kernelEps[channel] = kernelEps[channel] + poly.kernelEps[channel];
+            for(size_t i = 0; i < nPolyCoeffs; i ++) {
+                res.coeffs[channel][i] = coeffs[channel][i] + poly.coeffs[channel][i];
+            }
+        }
+        return res;
+    }
+
+    template <typename U>
+    PolyStorage operator*(const U &f) const {
+        PolyStorage res;
+        for (int channel = 0; channel < 3; channel++) {
+            res.kernelEps[channel] = kernelEps[channel] * f;
+            for (size_t i = 0; i < nPolyCoeffs; i++) {
+                res.coeffs[channel][i] = coeffs[channel][i] * f;
+            }
+        }
+        return res;
+    }
+
+};
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_PBRT_H

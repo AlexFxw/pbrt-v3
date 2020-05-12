@@ -91,7 +91,6 @@ struct Interaction {
         return mediumInterface.inside;
     }
 
-    const Float* GetPolyCoeffs(int channel) const;
 
     // Interaction Public Data
     Point3f p;
@@ -99,7 +98,6 @@ struct Interaction {
     Vector3f pError;
     Vector3f wo;
     Normal3f n;
-    PolyStorage *polyStorage = nullptr;
     MediumInterface mediumInterface;
 };
 
@@ -127,6 +125,7 @@ class SurfaceInteraction : public Interaction {
                        const Normal3f &dndu, const Normal3f &dndv, Float time,
                        const Shape *sh,
                        int faceIndex = 0);
+
     void SetShadingGeometry(const Vector3f &dpdu, const Vector3f &dpdv,
                             const Normal3f &dndu, const Normal3f &dndv,
                             bool orientationIsAuthoritative);
@@ -135,6 +134,9 @@ class SurfaceInteraction : public Interaction {
         bool allowMultipleLobes = false,
         TransportMode mode = TransportMode::Radiance);
     void ComputeDifferentials(const RayDifferential &r) const;
+
+    const Float* GetPolyCoeffs(int channel) const;
+
     Spectrum Le(const Vector3f &w) const;
 
     // SurfaceInteraction Public Data
@@ -152,6 +154,8 @@ class SurfaceInteraction : public Interaction {
     BSSRDF *bssrdf = nullptr;
     mutable Vector3f dpdx, dpdy;
     mutable Float dudx = 0, dvdx = 0, dudy = 0, dvdy = 0;
+
+    PolyStorage* polyStorage = nullptr;
 
     // Added after book publication. Shapes can optionally provide a face
     // index with an intersection point for use in Ptex texture lookups.

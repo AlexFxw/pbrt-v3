@@ -33,8 +33,8 @@ int VaeHandlerEigen::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes,
 
 ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f &wo,
                                               const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
-                                              const Spectrum &albedo, float g, float eta, Sampler &sampler,
-                                              const Interaction &isect, bool projectSamples, int channel) const {
+                                              const Spectrum &albedo, float g, float eta, const SurfaceInteraction &isect,
+                                              bool projectSamples, int channel, SurfaceInteraction *res) const {
     FeatureModel<3>::ShapeVector shapeCoeffEigen;
     FeatureModel<3>::ShapeVector shapeCoeffEigenWs;
     Transform asTransform;
@@ -71,10 +71,11 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     sRec.throughout = Spectrum(1.0f - absorption);
     sRec.w = Vector3f(1.0, 0, 0); // FIXME
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
+    sRec.p = sampledP;
     sRec.isValid = absorption < 1.0f;
     // Project the sampled points to the surface.
     PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
-                                      mConfig.polyOrder, false, fitScaleFactor, kernelEps);
+                                      mConfig.polyOrder, false, fitScaleFactor, kernelEps, res);
     return sRec;
 }
 
