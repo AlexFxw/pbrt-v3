@@ -84,6 +84,10 @@ class Shape {
     const Transform *ObjectToWorld, *WorldToObject;
     const bool reverseOrientation;
     const bool transformSwapsHandedness;
+
+    Float WorldToObjectAreaScale() const {
+        return 1.0f / WorldToObject->AreaScale();
+    }
 };
 
 }  // namespace pbrt

@@ -131,6 +131,7 @@ public:
                       mat[2][2], mat[2][3], mat[3][0], mat[3][1], mat[3][2],
                       mat[3][3]);
         mInv = Inverse(m);
+        areaScale = 0.0f;
     }
 
     Transform(const Matrix4x4 &m) : m(m), mInv(Inverse(m)) {}
@@ -186,6 +187,16 @@ public:
 #undef NOT_ONE
     }
 
+    Float AreaScale() const {
+        if(areaScale == 0.0f) {
+            Float la2 = (*this)(Vector3f(1, 0, 0)).LengthSquared();
+            Float lb2 = (*this)(Vector3f(0, 1, 0)).LengthSquared();
+            Float lc2 = (*this)(Vector3f(0, 0, 1)).LengthSquared();
+            areaScale = std::sqrt(la2) * std::sqrt(lb2) * std::sqrt(lc2);
+        }
+        return areaScale;
+    }
+
     template<typename T>
     inline Point3<T> operator()(const Point3<T> &p) const;
     template<typename T>
@@ -224,6 +235,7 @@ public:
 private:
     // Transform Private Data
     Matrix4x4 m, mInv;
+    mutable Float areaScale = 0.0f;
 
     friend class AnimatedTransform;
 

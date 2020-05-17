@@ -15,16 +15,19 @@ int VaeHandlerEigen::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes,
     VaeHandler::Prepare(shapes, pfConfig);
     const std::string shapeFeatureName = "mlsPolyLS3";
 
-    featureModel = std::unique_ptr<FeatureModel<3>>(new FeatureModel<3>(
-            mScatterVariableDir, mConfig.stats, shapeFeatureName
-    ));
+    // featureModel = std::unique_ptr<FeatureModel<3>>(new FeatureModel<3>(
+    //         mScatterVariableDir, mConfig.stats, shapeFeatureName
+    // ));
 
-    scatterModel = std::unique_ptr<ScatterModelBase<3>>(new ScatterModel<3>(
-            mScatterVariableDir, mConfig.stats, shapeFeatureName
-    ));
+    // scatterModel = std::unique_ptr<ScatterModelBase<3>>(new ScatterModel<3>(
+    //         mScatterVariableDir, mConfig.stats, shapeFeatureName
+    // ));
 
-    absorptionModel = std::unique_ptr<AbsorptionModel<3>>(new AbsorptionModel<3>(
-            mAbsVariableDir, mConfig.stats, shapeFeatureName
+    // absorptionModel = std::unique_ptr<AbsorptionModel<3>>(new AbsorptionModel<3>(
+    //         mAbsVariableDir, mConfig.stats, shapeFeatureName
+    // ));
+    scatterModel = std::unique_ptr<ScatterModelBase<3>>(new ScatterModelSimShared<3>(
+            mScatterVariableDir, mAbsVariableDir, mConfig.stats, shapeFeatureName
     ));
 
     LOG(INFO) << "Finish preparing VAEHandlerEigen.";
@@ -33,7 +36,8 @@ int VaeHandlerEigen::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes,
 
 ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f &wo,
                                               const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
-                                              const Spectrum &albedo, float g, float eta, const SurfaceInteraction &isect,
+                                              const Spectrum &albedo, Float g, Float eta,
+                                              const SurfaceInteraction &isect,
                                               bool projectSamples, int channel, SurfaceInteraction *res) const {
     FeatureModel<3>::ShapeVector shapeCoeffEigen;
     FeatureModel<3>::ShapeVector shapeCoeffEigenWs;
@@ -56,30 +60,49 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     Float kernelEps = PolyUtils::GetKernelEps(mAvgMedium, channel, this->mKernelEpsScale);
     Float fitScaleFactor = PolyUtils::GetFitScaleFactor(kernelEps);
 
-    FeatureModel<3>::PreprocessFeatureShape preprocessFeatures =
-            featureModel->GetPreprocessFeature(mediumParas.albedo, mediumParas.g, mediumParas.eta, mediumParas.sigmaT,
-                                               fitScaleFactor, shapeCoeffEigen);
-    FeatureModel<3>::FeatureShape features = featureModel->Run(preprocessFeatures);
+    // FeatureModel<3>::PreprocessFeatureShape preprocessFeatures =
+    //         featureModel->GetPreprocessFeature(mediumParas.albedo, mediumParas.g, mediumParas.eta, mediumParas.sigmaT,
+    //                                            fitScaleFactor, shapeCoeffEigen);
+    // FeatureModel<3>::FeatureShape features = featureModel->Run(preprocessFeatures);
 
-    Float absorption = absorptionModel->Run(features);
-    Eigen::Vector3f outPos = scatterModel->Run(features);
+    // Float absorption = absorptionModel->Run(features);
+    // Eigen::Vector3f outPos = scatterModel->Run(features);
 
-    outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
-    outPos = inPos + (outPos - inPos) / sigmaT.Average();
+
+    Float absorption;
+    Eigen::Vector3f outPos;
+    // FIXME: not using medium paras
+    // std::tie(outPos, absorption) = scatterModel->Run(inPos, inDir, mediumParas.albedo, mediumParas.g, mediumParas.eta,
+    //                                                  mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
+    std::tie(outPos, absorption) = scatterModel->Run(inPos, inDir, mediumParas.albedo, g, eta,
+                                                     mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
+    // FIXME: Need to modify?
+    // outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
+    // outPos = inPos + (outPos - inPos) / sigmaT.Average();
 
     ScatterSamplingRecord sRec;
     sRec.throughout = Spectrum(1.0f - absorption);
-    sRec.w = Vector3f(1.0, 0, 0); // FIXME
+    // sRec.w = Vector3f(1.0, 0, 0); // FIXME
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
+    // std::cout << "Inpos/outpos: " << po << ", " << sampledP << std::endl;
     sRec.p = sampledP;
     sRec.isValid = absorption < 1.0f;
+    // if(!sRec.isValid) {
+    //     return sRec;
+    // }
     // Project the sampled points to the surface.
-    PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
-                                      mConfig.polyOrder, false, fitScaleFactor, kernelEps, res);
+    if(mConfig.predictionSpace == "AS") {
+        PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
+                                          mConfig.polyOrder, false, fitScaleFactor, kernelEps, res);
+    }
+    else {
+        PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
+                                          mConfig.polyOrder, mConfig.predictionSpace == "LS", fitScaleFactor, kernelEps, res);
+    }
     return sRec;
 }
 
-VaeHandlerEigen::VaeHandlerEigen(const Spectrum &sigmaT, const Spectrum &albedo, float g, float eta,
+VaeHandlerEigen::VaeHandlerEigen(const Spectrum &sigmaT, const Spectrum &albedo, Float g, Float eta,
                                  const std::string &modelName, const std::string &absModelName,
                                  const std::string &angularModelName, const std::string &outputDir, int batchSize,
                                  Float kernelEpsScale) :

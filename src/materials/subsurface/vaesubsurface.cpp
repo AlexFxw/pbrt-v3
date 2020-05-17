@@ -13,7 +13,7 @@ void VAESubsurface::ComputeScatteringFunctions(SurfaceInteraction *si, MemoryAre
     // TODO
     // Use the BSDF of subsurface material, but replace the bssrdf with vae scattering function implementation.
     SubsurfaceMaterial::ComputeScatteringFunctions(si, arena, mode, allowMultipleLobes);
-    si->bssrdf = ARENA_ALLOC(arena, VaeScatter)(*si, eta, this->mVaeHandler);
+    si->bssrdf = ARENA_ALLOC(arena, VaeScatter)(*si, this->eta, this->mVaeHandler, mode);
 }
 
 VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
@@ -24,7 +24,7 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
             sig_s = Spectrum::FromRGB(sig_s_rgb);
     std::string name = mp.FindString("name");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
-    Float g = mp.FindFloat("g", 0.0f);
+    Float g = mp.FindFloat("g", 1.0f);
     Float kernelEpsScale = mp.FindFloat("kernelEpsScale", 1.0f);
     if (name != "") {
         if (!found)

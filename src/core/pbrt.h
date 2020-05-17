@@ -264,14 +264,17 @@ class VaeHandlerEigen;
 template<size_t PolyOrder = 3, size_t PreLayerWidth = 64>
 class ScatterModelBase;
 
-template<size_t PolyOrder = 3, size_t NLatent = 4, size_t LayerWidth = 64, size_t PreLayerWidth = 64>
-class ScatterModel;
+// template<size_t PolyOrder = 3, size_t NLatent = 4, size_t LayerWidth = 64, size_t PreLayerWidth = 64>
+// class ScatterModel;
 
 template<size_t PolyOrder = 3, size_t LayerWidth = 32, size_t FeatureDim = 64>
 class AbsorptionModel;
 
 template<size_t PolyOrder = 3, size_t LayerWidth = 64, size_t FeatureDim = 64>
 class FeatureModel;
+
+template <size_t PolyOrder = 3, size_t NLatent = 4, size_t LayerWidth = 64, size_t PreLayerWidth = 64>
+class ScatterModelSimShared;
 
 struct PolyStorage;
 
@@ -631,13 +634,13 @@ void permute_inplace(
 }
 
 inline Float GetRandomFloat() {
-    std::default_random_engine randomEngine(time(NULL));
+    std::default_random_engine randomEngine(std::random_device{}());
     std::uniform_real_distribution<Float> unif(0.0, 1.0);
     return unif(randomEngine);
 }
 
 struct PolyStorage {
-    float coeffs[3][20];
+    Float coeffs[3][20];
     float kernelEps[3];
     size_t nPolyCoeffs = 20;
 

@@ -22,7 +22,7 @@ namespace pbrt {
 class VaeHandler {
 public:
     VaeHandler(const Spectrum &sigmaT,
-               const Spectrum &albedo, float g, float eta, const std::string &modelName,
+               const Spectrum &albedo, Float g, Float eta, const std::string &modelName,
                const std::string &absModelName, const std::string &angularModelName,
                const std::string &outputDir, int batchSize);
 
@@ -30,7 +30,7 @@ public:
 
     virtual ScatterSamplingRecord Sample(const Point3f &po, const Vector3f &wo,
                                          const Scene *scene, const Normal3f &polyNormal, const Spectrum &sigmaT,
-                                         const Spectrum &albedo, float g, float eta, const SurfaceInteraction &isect,
+                                         const Spectrum &albedo, Float g, Float eta, const SurfaceInteraction &isect,
                                          bool projectSamples, int channel, SurfaceInteraction *res) const = 0;
 
     virtual int Prepare(const std::vector<std::shared_ptr<Shape>> &shapes, const PolyUtils::PolyFitConfig &pfConfig);
@@ -46,7 +46,7 @@ public:
     GetPolyCoeffsAs(const Point3f &p, const Vector3f &d,
                     const Normal3f &polyNormal,
                     const SurfaceInteraction &its, int channel = 0) {
-        const float *coeffs = its.GetPolyCoeffs(channel);
+        const Float *coeffs = its.GetPolyCoeffs(channel);
         Transform transf = AzimuthSpaceTransform(-d, polyNormal);
         const Matrix4x4 &m = transf.GetMatrix();
         Vector3f s(m(0, 0), m(0, 1), m(0, 2));
@@ -61,7 +61,6 @@ public:
 
 protected:
     VaeConfig mConfig;
-    std::vector<std::vector<ConstraintKDTree>> mKDTrees;
     std::string mModelName;
     size_t mBatchSize;
     int mPolyOrder;

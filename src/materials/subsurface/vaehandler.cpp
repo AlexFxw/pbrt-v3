@@ -12,12 +12,14 @@
 #include "sampling.h"
 #include "shapes/triangle.h"
 #include "network_utils.h"
+#include "parallel.h"
 #include <random>
 #include <ctime>
 
+
 namespace pbrt {
 
-VaeHandler::VaeHandler(const Spectrum &sigmaT, const Spectrum &albedo, float g, float eta, const std::string &modelName,
+VaeHandler::VaeHandler(const Spectrum &sigmaT, const Spectrum &albedo, Float g, Float eta, const std::string &modelName,
                        const std::string &absModelName, const std::string &angularModelName,
                        const std::string &outputDir, int batchSize) {
     mBatchSize = batchSize;
@@ -51,10 +53,10 @@ void VaeHandler::PrecomputePolynomials(const std::vector<std::shared_ptr<Shape>>
                                        const pbrt::MediumParameters &mediumPara,
                                        const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
     LOG(INFO) << "Precompute the polynomials";
-    mKDTrees.push_back(std::vector<ConstraintKDTree>());
+    // mKDTrees.push_back(std::vector<ConstraintKDTree>());
     if (mediumPara.isRgb()) {
-        mKDTrees.push_back(std::vector<ConstraintKDTree>());
-        mKDTrees.push_back(std::vector<ConstraintKDTree>());
+        // mKDTrees.push_back(std::vector<ConstraintKDTree>());
+        // mKDTrees.push_back(std::vector<ConstraintKDTree>());
         PrecomputePolynomialsImpl(shapes, 0, mediumPara, pfConfig);
         PrecomputePolynomialsImpl(shapes, 1, mediumPara, pfConfig);
         PrecomputePolynomialsImpl(shapes, 2, mediumPara, pfConfig);
@@ -67,49 +69,56 @@ void VaeHandler::PrecomputePolynomials(const std::vector<std::shared_ptr<Shape>>
 void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Shape>> &shapes, int channel,
                                            const pbrt::MediumParameters &mediumPara,
                                            const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
-    // TODO: Modify the implementation. Use primitives or shapes?
-    std::default_random_engine randomEngine(time(NULL));
-    std::uniform_real_distribution<Float> unif(0.0, 1.0);
+    // FIXME: Seems to be wrong here.
     // 1. Sampling max{1024, 2\sigma_n^2 * SurfaceArea} points around the neighborhood.
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
     std::shared_ptr<TriangleMesh> triMesh(PreprocessTriangles(shapes));
-    int nSamples = std::min(int(triMesh->Area() * 2.0f / kernelEps), 1024);
+    int nSamples = std::max(int(triMesh->Area() * 2.0f / kernelEps), 1024);
+    nSamples = std::min(nSamples, 1000000); // FIXME: Adjust the kernel eps instead.
     std::vector<Point3f> sampledP;
     std::vector<Normal3f> sampledN;
+
+    DCHECK_EQ(triMesh->nTriangles, shapes.size());
+
+
     for (int i = 0; i < nSamples; i++) {
         Float pdf;
-        size_t trigIdx = triMesh->areaDistri->SampleDiscrete(unif(randomEngine));
-        Interaction isect = shapes[trigIdx]->Sample(Point2f(unif(randomEngine), unif(randomEngine)), &pdf);
+        size_t trigIdx = triMesh->areaDistri->SampleDiscrete(GetRandomFloat());
+        Interaction isect = shapes[trigIdx]->Sample(RandPoint2f(), &pdf);
         sampledP.push_back(isect.p);
         sampledN.push_back(isect.n);
     }
     // 2. Build a constraint KD-tree to accelerate the precomputation. Only computed once before rendering.
-    mKDTrees[channel].push_back(ConstraintKDTree());
-    mKDTrees[channel].back().Build(sampledP, sampledN);
+    // mKDTrees[channel].push_back(ConstraintKDTree());
+    // mKDTrees[channel].back().Build(sampledP, sampledN);
+    ConstraintKDTree kdTree;
+    kdTree.Build(sampledP, sampledN);
+
     if (!triMesh->HasPolyCoeffs())
         triMesh->CreatePolyCoeffs();
     PolyStorage *polyCoeffs = triMesh->GetPolyeffs();
 
+    DCHECK(triMesh->n != NULL);
+
     // 3. Fit the polynomials in surrounding by solving the 20 * 20 linear systems.
-    for (int i = 0; i < triMesh->nVertices; i++) {
+    ParallelFor([&](int64_t i) {
         PolyUtils::PolyFitRecord pfRec;
         pfRec.p = triMesh->p[i];
-        // FIXME: Why n is null?
-        pfRec.d = triMesh->n ? (Vector3f) triMesh->n[i] : Vector3f();
-        pfRec.n = triMesh->n ? triMesh->n[i] : Normal3f();
+        pfRec.d = Vector3f(triMesh->n[i]);
+        pfRec.n = triMesh->n[i];
         pfRec.kernelEps = kernelEps;
         pfRec.config = pfConfig;
         pfRec.config.useLightspace = false;
         PolyUtils::Polynomial res;
         std::vector<Point3f> pts;
         std::vector<Normal3f> dirs;
-        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &(mKDTrees[channel].back()));
+        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
         for (int k = 0; k < res.coeffs.size(); k++) {
             polyCoeffs[i].coeffs[channel][k] = res.coeffs[k];
             polyCoeffs[i].kernelEps[channel] = kernelEps;
             polyCoeffs[i].nPolyCoeffs = res.coeffs.size();
         }
-    }
+    }, triMesh->nVertices, 1024);
 }
 
 

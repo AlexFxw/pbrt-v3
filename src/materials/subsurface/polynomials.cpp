@@ -8,6 +8,7 @@
 #include "bssrdf.h"
 #include "shapes/triangle.h"
 #include "interaction.h"
+#include "parallel.h"
 #include <cmath>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -100,8 +101,8 @@ Eigen::VectorXi DerivPermutationEigen(size_t degree, size_t axis) {
 void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::vector<Normal3f> &sampledN) {
     int pointsNum = sampledP.size();
     mTree = CTree(pointsNum);
-
-    for (size_t i = 0; i < pointsNum; i++) {
+    LOG(INFO) << "Build constraint kd tree: " << pointsNum;
+    ParallelFor([&](int64_t i) {
         mTree[i].SetPosition(sampledP[i]);
         ExtraData d;
         d.p = sampledP[i];
@@ -110,10 +111,10 @@ void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::ve
         d.avgN = Normal3f(-10, -10, -10);
         d.avgP = Point3f(-100, -100, -100);
         mTree[i].SetData(d);
-    }
-
+    }, pointsNum, 1024);
     mTree.Build(true);
     CalcAvgValues(mTree[0], 0);
+    LOG(INFO) << "Calculated the average value";
 
     for (size_t i = 0; i < std::min(size_t(32), sampledP.size()); i++) {
         mPoints.push_back(sampledP[i]);
@@ -122,6 +123,7 @@ void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::ve
 }
 
 std::tuple<Point3f, Normal3f, size_t> ConstraintKDTree::CalcAvgValues(TreeNode &node, TreeNode::IndexType index) {
+    LOG(INFO) << "Calculating average value of index: " << index;
     Point3f rp, lp;
     Normal3f rn, ln;
     size_t rSamples = 0, lSamples = 0;
@@ -157,11 +159,12 @@ ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
     GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
 
     // Add the super constraints
-    for (size_t i = 0; i < mPoints.size(); ++i) {
-        positions.push_back(mPoints[i]);
-        normals.push_back(mNormals[i]);
-        sampleWeights.push_back(-1.0f);
-    }
+    // FIXME: Why add samped P here?
+    // for (size_t i = 0; i < mPoints.size(); ++i) {
+    //     positions.push_back(mPoints[i]);
+    //     normals.push_back(mNormals[i]);
+    //     sampleWeights.push_back(-1.0f);
+    // }
     return std::make_tuple(positions, normals, sampleWeights);
 }
 
@@ -171,10 +174,11 @@ void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pb
                                       pbrt::Float kernelEps,
                                       const std::function<Float(Float, Float)> &kernelFunc) const {
     Float dist2Threshold = 9.0 * kernelEps;
-    if (pbrt::DistanceSquared(p, aabb) > dist2Threshold) {
+    Float distSq =pbrt::DistanceSquared(p, aabb);
+    if (distSq > dist2Threshold) {
         return;
     }
-    if (pbrt::DistanceSquared(node.GetData().p, p) < dist2Threshold) {
+    if (distSq < dist2Threshold) {
         points.push_back(node.GetData().p);
         normals.push_back(node.GetData().n);
         sampleWeights.push_back(1.0f);
@@ -244,6 +248,7 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
     std::vector<Normal3f> normConstraints;
     std::vector<Float> sampleWeights;
 
+    // Problems may come from here.
     std::tie(posConstraints, normConstraints, sampleWeights) = kdTree->GetConstraints(pfRec.p, kernelEps, kernelFunc);
 
     size_t n = posConstraints.size();
@@ -251,10 +256,10 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
 
     Eigen::VectorXf weights(n);
     Vector3f s, t;
-    Normal3f pfd = (Normal3f) pfRec.d;
+    Normal3f pfd = Normal3f(pfRec.d);
     OnbDuff(pfd, s, t);
-
     PolyUtils::Frame local(s, t, pfd);
+
     bool useLightspace = pfRec.config.useLightspace;
 
     for (size_t i = 0; i < n; i++) {
@@ -276,7 +281,7 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
     for (size_t i = 0; i < n; i++) {
         Normal3f normal = normConstraints[i];
         if (useLightspace) {
-            normal = (Normal3f) local.toLocal((Vector3f) normal);
+            normal = Normal3f(local.toLocal(Vector3f(normal)));
         }
         weightedB[i] = 0.0f;
         weightedB[i + 1 * n] = normal.x * weights[i];
@@ -323,6 +328,7 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
     }
 
     std::vector<Float> coeffsVec(NumPolynomialCoefficients(polyOrder));
+    size_t cfSize = coeffsVec.size();
     if (hardSurfaceConstraint) {
         coeffsVec[0] = 0.0f;
         for (size_t i = 1; i < coeffs.size(); ++i)
@@ -368,26 +374,23 @@ std::pair<float, Vector3f> EvalPolyGrad(const Point3f &pos,
                                         const int *permX, const int *permY, const int *permZ,
                                         Float scaleFactor, bool useLocalDir, const Vector3f &refDir,
                                         const T &coeffs) {
-    // FIXME: Donot use evalP here.
     Vector3f relPos;
     if (useLocalDir) {
         Vector3f s, t;
         PolyUtils::OnbDuff(Normal3f(refDir), s, t);
         PolyUtils::Frame local(s, t, Normal3f(refDir));
-        // relPos = local.toLocal(evalP - pos) * scaleFactor;
-        relPos = local.toLocal(Vector3f(pos)) * scaleFactor;
+        relPos = local.toLocal(Vector3f(evalP - pos)) * scaleFactor;
     } else {
-        // relPos = (evalP - pos) * scaleFactor;
-        relPos = Vector3f(pos) * scaleFactor;
+        relPos = Vector3f(evalP - pos) * scaleFactor;
     }
 
     size_t termIdx = 0;
     Vector3f deriv(0.0f, 0.0f, 0.0f);
     float value = 0.0f;
 
-    float xPowers[4] = {1.0, relPos.x, relPos.x * relPos.x, relPos.x * relPos.x * relPos.x};
-    float yPowers[4] = {1.0, relPos.y, relPos.y * relPos.y, relPos.y * relPos.y * relPos.y};
-    float zPowers[4] = {1.0, relPos.z, relPos.z * relPos.z, relPos.z * relPos.z * relPos.z};
+    Float xPowers[4] = {1.0, relPos.x, relPos.x * relPos.x, relPos.x * relPos.x * relPos.x};
+    Float yPowers[4] = {1.0, relPos.y, relPos.y * relPos.y, relPos.y * relPos.y * relPos.y};
+    Float zPowers[4] = {1.0, relPos.z, relPos.z * relPos.z, relPos.z * relPos.z * relPos.z};
     for (size_t d = 0; d <= degree; ++d) {
         for (size_t i = 0; i <= d; ++i) {
             size_t dx = d - i;
@@ -401,11 +404,11 @@ std::pair<float, Vector3f> EvalPolyGrad(const Point3f &pos,
                 int pY = permY[termIdx];
                 int pZ = permZ[termIdx];
                 if (pX > 0)
-                    deriv.x += (dx + 1) * t * coeffs[pX];
+                    deriv.x += ((float)dx + 1.0f) * t * coeffs[pX];
                 if (pY > 0)
-                    deriv.y += (dy + 1) * t * coeffs[pY];
+                    deriv.y += ((float)dy + 1.0f) * t * coeffs[pY];
                 if (pZ > 0)
-                    deriv.z += (dz + 1) * t * coeffs[pZ];
+                    deriv.z += ((float)dz + 1.0f) * t * coeffs[pZ];
                 ++termIdx;
             }
         }
@@ -420,14 +423,16 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
     if (!rec.isValid)
         return;
 
-    // FIXME: Adjust the dir.
     Vector3f dir = EvaluateGradient(refPoint, polyCoefficients, rec, polyOrder, scaleFactor, useLocalDir, refDir);
     Float dists[2] = {2 * kernelEps, std::numeric_limits<Float>::infinity()};
 
+    // FIXME: Adjust the dir.
+    dir = Normalize(dir);
+
     for (int i = 0; i < 2; i++) {
         Float maxDist = dists[i];
-        Ray r1(rec.p, dir);
-        SurfaceInteraction its;
+        Ray r1(rec.p, dir); // FIXME: Add maxDist?
+        SurfaceInteraction its, its2;
         Point3f projectedP;
         Normal3f normal;
         Float pointTime = -1.0f;
@@ -437,19 +442,20 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
             normal = its.shading.n; // FIXME: Note the difference between shading.n and n
             pointTime = its.time;
             itsFound = true;
+            *res = its;
         }
         Float maxT = itsFound ? its.time : maxDist;
         Ray r2(rec.p, -dir);
-        if (scene->Intersect(r2, &its)) {
-            if (pointTime < 0 || pointTime > its.time) {
-                projectedP = its.p;
-                normal = its.shading.n;
+        if (scene->Intersect(r2, &its2)) {
+            if (pointTime < 0 || pointTime > its2.time) {
+                projectedP = its2.p;
+                normal = its2.shading.n;
             }
             itsFound = true;
+            *res = its2;
         }
         rec.isValid = itsFound;
         if (itsFound) {
-            *res = its;
             rec.p = projectedP;
             rec.n = normal;
             return;
@@ -497,7 +503,7 @@ Normal3f PolyUtils::AdjustRayDirForPolynomialTracing(Vector3f &inDir, const Surf
     float angle = acos(std::max(std::min(Dot(polyNormal, normalizedTarget), 1.0f), -1.0f));
     Transform transf = pbrt::Rotate(Degrees(angle), rotationAxis);
     inDir = transf(inDir);
-    return (Normal3f) polyNormal;
+    return Normal3f(polyNormal);
 }
 
 } // namespace pbrt.

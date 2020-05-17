@@ -1634,9 +1634,7 @@ inline Point2f SquareToStdNormal(const Point2f &sample) {
 }
 
 inline Point2f RandPoint2f() {
-    std::default_random_engine randomEngine(time(NULL));
-    std::uniform_real_distribution<Float> unif(0.0, 1.0);
-    return Point2f(unif(randomEngine), unif(randomEngine));
+    return Point2f(GetRandomFloat(), GetRandomFloat());
 }
 
 }  // namespace pbrt

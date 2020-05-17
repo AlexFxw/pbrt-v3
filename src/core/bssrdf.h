@@ -52,9 +52,8 @@ Float FresnelMoment2(Float invEta);
 // The struct is used for recording sampled scatter info
 struct ScatterSamplingRecord {
     Point3f p;
-    Vector3f w;
     Normal3f n;
-    bool isValid;
+    bool isValid = false;
     Spectrum throughout;
     int sampledChannel = - 1;
 };

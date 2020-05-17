@@ -59,6 +59,10 @@ struct SimpleKDNode {
         right = value;
     }
 
+    void SetLeftIndex(IndexType self, IndexType value) {
+        // Do nothing
+    }
+
     // Get the split axis of this node.
     uint16_t GetAxis() const { return flags & (uint8_t) EAxisMask; }
 
@@ -113,8 +117,9 @@ public:
     inline const Bounds3f &GetAABB() const { return mAABB; }
 
     void Build(bool recomputeAABB = false) {
+        LOG(INFO) << "Building the kd tree.";
         if (recomputeAABB) {
-            mAABB = Bounds3f();
+            mAABB = Bounds3f(Point3f(), Point3f());
             for (auto iter = mNodes.begin(); iter != mNodes.end(); iter++) {
                 mAABB = pbrt::Union(mAABB, iter->pos);
             }
@@ -153,8 +158,9 @@ public:
             splitNode.SetRightIndex((IndexType) (rangeStart - base), 0);
         }
         // TODO: Set left
-
+        splitNode.SetLeftIndex((IndexType)(rangeStart - base), (IndexType)(rangeStart + 1 -base));
         std::iter_swap(rangeStart, split);
+
         Float tmp = mAABB.pMax[axis], splitPos = splitNode.pos[axis];
         mAABB.pMax[axis] = splitPos;
         BuildImpl(depth + 1, base, rangeStart + 1, split + 1);
@@ -258,7 +264,7 @@ public:
 
         /// Convert from local coordinates to world coordinates
         inline Vector3f toWorld(const Vector3f &v) const {
-            return s * v.x + t * v.y + (Vector3f) n * v.z;
+            return s * v.x + t * v.y + Vector3f( n) * v.z;
         }
     };
 
