@@ -362,7 +362,7 @@ bool Triangle::Intersect(const Ray &ray, Float *tHit, SurfaceInteraction *isect,
         const PolyStorage &poly1 = mesh->poly[v[1]];
         const PolyStorage &poly2 = mesh->poly[v[2]];
         PolyStorage hitPoly = poly0 * b0 + poly1 * b1 + poly2 * b2;
-        isect->polyStorage = new PolyStorage(hitPoly);
+        isect->polyStorage = hitPoly;
     }
 
     // Override surface normal in _isect_ for triangle

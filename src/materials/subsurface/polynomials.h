@@ -157,7 +157,6 @@ public:
         } else {
             splitNode.SetRightIndex((IndexType) (rangeStart - base), 0);
         }
-        // TODO: Set left
         splitNode.SetLeftIndex((IndexType)(rangeStart - base), (IndexType)(rangeStart + 1 -base));
         std::iter_swap(rangeStart, split);
 

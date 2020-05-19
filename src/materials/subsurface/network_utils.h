@@ -357,7 +357,7 @@ public:
         Eigen::Matrix<float, 1, 1> a = absorption_dense_kernel * absTmp + absorption_dense_bias;
         Float absorption = NetworkUtils::sigmoid(a[0]);
 
-        // FIXME: should use sampler here?
+        // FIXME: Do not filter the absorption
         Float randFloat = GetRandomFloat();
         if (randFloat > absorption) {
             absorption = 0.0f; // nothing gets absorbed instead
@@ -376,20 +376,23 @@ public:
         y = (scatter_decoder_fcn_fcn_2_weights * y + scatter_decoder_fcn_fcn_2_biases).cwiseMax(0.0f);
         Eigen::Vector3f outPos = scatter_dense_2_kernel * y + scatter_dense_2_bias;
 
-        if (m_useEpsilonSpace) {
-            if (m_useAsSpace) {
-                // FIXME: Direct transform?
-                Vector3f tmp = toAsTransform(Vector3f(outPos[0], outPos[1], outPos[2])) / fitScaleFactor;
-                outPos = Eigen::Vector3f(tmp.x, tmp.y, tmp.z) + inPos;
-            } else {
-                outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
-                outPos = inPos + (outPos - inPos) / fitScaleFactor;
-            }
-        } else {
-            outPos = outPos.cwiseProduct(m_outPosStd) + m_outPosMean;
-            outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
-            outPos = inPos + (outPos - inPos) / sigmaTp.Average();
-        }
+        // FIXME: 2 times transform?
+        // if (m_useEpsilonSpace) {
+        //     if (m_useAsSpace) {
+        //         // FIXME: Direct transform?
+        //         Vector3f tmp = toAsTransform(Vector3f(outPos[0], outPos[1], outPos[2])) / fitScaleFactor;
+        //         outPos = Eigen::Vector3f(tmp.x, tmp.y, tmp.z) + inPos;
+        //     } else {
+        //         outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
+        //         outPos = inPos + (outPos - inPos) / fitScaleFactor;
+        //     }
+        // } else {
+        //     outPos = outPos.cwiseProduct(m_outPosStd) + m_outPosMean;
+        //     outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
+        //     outPos = inPos + (outPos - inPos) / sigmaTp.Average();
+        // }
+        outPos = outPos.cwiseProduct(m_outPosStd) + m_outPosMean;
+        // outPos = inPos + (outPos - inPos) / fitScaleFactor;
         return std::make_pair(outPos, absorption);
     }
 

@@ -24,7 +24,7 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
             sig_s = Spectrum::FromRGB(sig_s_rgb);
     std::string name = mp.FindString("name");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
-    Float g = mp.FindFloat("g", 1.0f);
+    Float g = mp.FindFloat("g", 0.1f);
     Float kernelEpsScale = mp.FindFloat("kernelEpsScale", 1.0f);
     if (name != "") {
         if (!found)

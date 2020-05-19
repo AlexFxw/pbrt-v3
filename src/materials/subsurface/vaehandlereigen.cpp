@@ -6,6 +6,7 @@
 #include "vaehandler.h"
 #include "interaction.h"
 #include "network_utils.h"
+#include "transform.h"
 #include "bssrdf.h"
 
 namespace pbrt {
@@ -50,8 +51,13 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     }
     // Calculate the polynomial coefficients
     std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
-    const Eigen::Vector3f inPos(po.x, po.y, po.z);
-    const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
+    // FIXME: Should I apply transform here?
+    Point3f localP = asTransform(po);
+    Vector3f localW = asTransform(wo);
+    // const Eigen::Vector3f inPos(po.x, po.y, po.z);
+    // const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
+    const Eigen::Vector3f inPos(localP.x, localP.y, localP.z);
+    const Eigen::Vector3f inDir(localW.x, localW.y, localW.z);
 
     Spectrum albedoChannel(albedo[channel]);
     Spectrum sigmaTChannel(sigmaT[channel]);
@@ -76,15 +82,20 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     //                                                  mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
     std::tie(outPos, absorption) = scatterModel->Run(inPos, inDir, mediumParas.albedo, g, eta,
                                                      mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
-    // FIXME: Need to modify?
-    // outPos = NetworkUtils::LocalToWorld(inPos, -inDir, outPos, true);
-    // outPos = inPos + (outPos - inPos) / sigmaT.Average();
-
     ScatterSamplingRecord sRec;
     sRec.throughout = Spectrum(1.0f - absorption);
-    // sRec.w = Vector3f(1.0, 0, 0); // FIXME
+
+    // FIXME: Need to modify?
+    // outPos = NetworkUtils::LocalToWorld(worldInPos, -worldInDir, outPos, true);
+    // outPos = worldInPos + (outPos - worldInPos) / sigmaT.Average();
+    outPos = inPos + (outPos - inPos) / sigmaT.Average();
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
-    // std::cout << "Inpos/outpos: " << po << ", " << sampledP << std::endl;
+    // FIXME: Apply tranform here?
+    Transform asTransformInv = Inverse(asTransform);
+    sampledP = asTransformInv(sampledP);
+
+    // sRec.w = Vector3f(1.0, 0, 0); // FIXME
+
     sRec.p = sampledP;
     sRec.isValid = absorption < 1.0f;
     // if(!sRec.isValid) {

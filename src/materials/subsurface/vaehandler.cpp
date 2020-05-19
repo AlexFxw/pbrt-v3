@@ -158,11 +158,16 @@ Transform VaeHandler::AzimuthSpaceTransform(const Vector3f &lightDir, const Norm
     if (std::abs(pbrt::Dot(normal, lightDir)) > 0.99999f) {
         Vector3f s, t;
         OnbDuff(light, s, t);
-        Matrix4x4 lsMatrix(s.x, s.y, s.z, 0, t.x, t.y, t.z, 0, lightDir.x, lightDir.y, lightDir.z, 0, 0, 0, 0, 1.0f);
+        Matrix4x4 lsMatrix(s.x, s.y, s.z, 0,
+                           t.x, t.y, t.z, 0,
+                           light.x, light.y, light.z, 0,
+                           0, 0, 0, 1.0f);
         return Transform(lsMatrix);
     } else {
-        Matrix4x4 lsMatrix(t1.x, t1.y, t1.z, 0, t2.x, t2.y, t2.z, 0, lightDir.x, lightDir.y, lightDir.z, 0, 0, 0, 0,
-                           1.0f);
+        Matrix4x4 lsMatrix(t1.x, t1.y, t1.z, 0,
+                           t2.x, t2.y, t2.z, 0,
+                           light.x, light.y, light.z, 0,
+                           0, 0, 0, 1.0f);
         return Transform(lsMatrix);
     }
 }

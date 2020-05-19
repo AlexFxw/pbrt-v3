@@ -159,12 +159,11 @@ ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
     GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
 
     // Add the super constraints
-    // FIXME: Why add samped P here?
-    // for (size_t i = 0; i < mPoints.size(); ++i) {
-    //     positions.push_back(mPoints[i]);
-    //     normals.push_back(mNormals[i]);
-    //     sampleWeights.push_back(-1.0f);
-    // }
+    for (size_t i = 0; i < mPoints.size(); ++i) {
+        positions.push_back(mPoints[i]);
+        normals.push_back(mNormals[i]);
+        sampleWeights.push_back(-1.0f);
+    }
     return std::make_tuple(positions, normals, sampleWeights);
 }
 
@@ -427,6 +426,10 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
     Float dists[2] = {2 * kernelEps, std::numeric_limits<Float>::infinity()};
 
     // FIXME: Adjust the dir.
+    if(dir.Length() < 1e-8) {
+        rec.isValid = false;
+        return;
+    }
     dir = Normalize(dir);
 
     for (int i = 0; i < 2; i++) {
@@ -494,7 +497,7 @@ Normal3f PolyUtils::AdjustRayDirForPolynomialTracing(Vector3f &inDir, const Surf
     Vector3f polyNormal;
     std::tie(polyValue, polyNormal) = EvalPolyGrad(isect.p, isect.p, polyOrder, pX, pY, pZ,
                                                    polyScaleFactor, false,
-                                                   inDir, isect.polyStorage->coeffs[channel]);
+                                                   inDir, isect.polyStorage.coeffs[channel]);
     Vector3f rotationAxis = pbrt::Cross(isect.shading.n, polyNormal);
     if (rotationAxis.Length() < 1e-8f) {
         return (Normal3f) polyNormal;
