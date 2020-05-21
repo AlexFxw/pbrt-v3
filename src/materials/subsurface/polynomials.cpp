@@ -217,7 +217,7 @@ void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f,
     auto leftIdx = node.GetLeftIndex(index);
     GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
 
-#ifdef VISUALIZE_SHAPE_DATA
+#ifdef VISUALIZE_SCATTER
     {
         // FIXME: Make visualize a parameter
         std::ofstream file;

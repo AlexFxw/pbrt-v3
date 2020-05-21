@@ -1,9 +1,9 @@
 Integrator "path" "integer maxdepth" [ 10 ]
 Transform [ 1 -0 -0 -0 -0 1 -0 -0 -0 -0 -1 -0 -0 -1 6.8 1]
-Sampler "sobol" "integer pixelsamples" [ 256 ]
+Sampler "sobol" "integer pixelsamples" [ 512 ]
 PixelFilter "triangle" "float xwidth" [ 1.000000 ] "float ywidth" [ 1.000000 ] 
-Film "image" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ] "string filename" [ "images/cornellbox-vae.exr" ]
-Camera "perspective" "float fov" [ 19.500000 ] 
+Film "image" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ] "string filename" [ "images/cornellbox-vae-512.exr" ]
+Camera "perspective" "float fov" [ 19.500000 ]
 WorldBegin
 	MakeNamedMaterial "LeftWall" "string type" [ "matte" ] "rgb Kd" [ 0.630000 0.065000 0.050000 ] 
 	MakeNamedMaterial "RightWall" "string type" [ "matte" ] "rgb Kd" [ 0.140000 0.450000 0.091000 ] 
@@ -11,7 +11,7 @@ WorldBegin
 	MakeNamedMaterial "Ceiling" "string type" [ "matte" ] "rgb Kd" [ 0.725000 0.710000 0.680000 ] 
 	MakeNamedMaterial "BackWall" "string type" [ "matte" ] "rgb Kd" [ 0.725000 0.710000 0.680000 ] 
 	MakeNamedMaterial "TallBox" "string type" [ "matte" ] "rgb Kd" [ 0.725000 0.710000 0.680000 ]
-	MakeNamedMaterial "ShortBox" "string type" [ "vaesubsurface" ] "float eta" [1.5] "float g" [0.1]
+	MakeNamedMaterial "ShortBox" "string type" [ "vaesubsurface" ] "string name" ["Marble"]
 	# MakeNamedMaterial "ShortBox" "string type" [ "subsurface" ] "string name" ["Milk"]
 	MakeNamedMaterial "Light" "string type" [ "matte" ] "rgb Kd" [ 0.000000 0.000000 0.000000 ]
 	NamedMaterial "Floor"

@@ -31,6 +31,7 @@ SET(VISUALIZE_SHAPE_DATA OFF)
 IF(VISUALIZE_SHAPE_DATA)
   ADD_DEFINITIONS( -D VISUALIZE_SHAPE_DATA)
 ENDIF()
+# ADD_DEFINITIONS(-D VISUALIZE_SCATTER)
 
 
 ###########################################################################

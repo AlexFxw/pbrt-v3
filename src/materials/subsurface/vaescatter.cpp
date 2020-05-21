@@ -33,11 +33,11 @@ Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                               Float *pdf) const {
     ProfilePhase pp(Prof::BSSRDFSampling);
     Vector3f refractedD = -this->po.wo; // FIXME: -
-    // Ray zeroScatterRay(this->po.p, refractedD); // - refracted?
-    // SurfaceInteraction zeroScatterIts;
-    // if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
-    //     return Spectrum(0.0f);
-    // }
+    Ray zeroScatterRay(this->po.p, refractedD); // - refracted?
+    SurfaceInteraction zeroScatterIts;
+    if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
+        return Spectrum(0.0f);
+    }
     // TODO: consider ray passes through situation.
 
     Spectrum Sp = Sample_Sp(scene, refractedD, si, pdf, 3);
