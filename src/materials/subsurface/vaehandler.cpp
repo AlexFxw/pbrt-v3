@@ -75,7 +75,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
     std::shared_ptr<TriangleMesh> triMesh(PreprocessTriangles(shapes));
     int nSamples = std::max(int(triMesh->Area() * 2.0f / kernelEps), 1024);
-    nSamples = std::min(nSamples, 1000000); // FIXME: Adjust the kernel eps instead.
+    nSamples = std::min(nSamples, 100000); // FIXME: Adjust the kernel eps instead.
     std::vector<Point3f> sampledP;
     std::vector<Normal3f> sampledN;
 
@@ -115,11 +115,10 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
         triMesh->CreatePolyCoeffs();
     PolyStorage *polyCoeffs = triMesh->GetPolyeffs();
 
-    // DCHECK(triMesh->n != NULL);
-
     // 3. Fit the polynomials in surrounding by solving the 20 * 20 linear systems.
     bool hasN = triMesh->n != NULL;
     ParallelFor([&](int64_t i) {
+        // printf("Fitting polynomial of vertix %d/%d\n", i, triMesh->nVertices);
         PolyUtils::PolyFitRecord pfRec;
         pfRec.p = triMesh->p[i];
         // FIXME: Should write a better solution for no N version.

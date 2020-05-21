@@ -57,7 +57,31 @@ public:
         return std::make_pair(shapeCoeffs, transf);
     }
 
-    const MediumParameters& GetMedium() const { return mAvgMedium; }
+    template<size_t PolyOrder = 3>
+    Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> GetPolyCoeffsEigen(
+            const Point3f &p, const Vector3f &d, const Normal3f &polyNormal,
+            const SurfaceInteraction *its, bool useLightSpace, int channel = 0) const {
+        if (its) {
+            // const Eigen::Vector3fXf &c = its->polyCoeffs;
+            const float *coeffs = its->GetPolyCoeffs(channel);
+            if (useLightSpace) {
+                Vector3f s, t;
+                Normal3f n = Normal3f(-d);
+                PolyUtils::OnbDuff(Normal3f(n), s, t);
+                Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> shapeCoeffs =
+                        PolyUtils::RotatePolynomialEigen<PolyOrder>(coeffs, s, t, n);
+                return shapeCoeffs;
+            } else {
+                Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1> shapeCoeffs;
+                for (int i = 0; i < its->polyStorage.nPolyCoeffs; ++i)
+                    shapeCoeffs[i] = coeffs[i];
+                return shapeCoeffs;
+            }
+        }
+        return Eigen::Matrix<float, PolyUtils::nPolyCoeffs(PolyOrder), 1>::Zero();
+    }
+
+    const MediumParameters &GetMedium() const { return mAvgMedium; }
 
 protected:
     VaeConfig mConfig;

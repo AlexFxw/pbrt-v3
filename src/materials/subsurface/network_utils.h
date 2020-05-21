@@ -368,15 +368,15 @@ public:
         Float absorption = NetworkUtils::sigmoid(a[0]);
 
         // FIXME: Do not filter the absorption
-        // Float randFloat = GetRandomFloat();
-        // if (randFloat > absorption) {
-        //     absorption = 0.0f; // nothing gets absorbed instead
-        // } else {
-        //     return std::make_pair(inPos, 1.0f); // all is absorbed
-        // }
-        if (1.0f - absorption < 1e-3) {
+        Float randFloat = GetRandomFloat();
+        if (randFloat > absorption) {
+            absorption = 0.0f; // nothing gets absorbed instead
+        } else {
             return std::make_pair(inPos, 1.0f); // all is absorbed
         }
+        // if (1.0f - absorption < 1e-3) {
+        //     return std::make_pair(inPos, 1.0f); // all is absorbed
+        // }
 
         // Concatenate features with random numbers
         Eigen::Matrix<float, NLatent, 1> latent(NLatent);

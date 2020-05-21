@@ -50,12 +50,16 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
         shapeCoeffEigenWs[i] = coeffs[i];
     }
     // Calculate the polynomial coefficients
-    std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
     // FIXME: Should I apply transform here?
-    Point3f localP = asTransform(po);
-    Vector3f localW = asTransform(wo);
-    // const Eigen::Vector3f inPos(po.x, po.y, po.z);
-    // const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
+    // std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
+
+    shapeCoeffEigen = VaeHandler::GetPolyCoeffsEigen<3>(po, wo, polyNormal, &isect,
+                                                        mConfig.predictionSpace == "LS", channel);
+
+    // Point3f localP = asTransform(po);
+    // Vector3f localW = asTransform(wo);
+    Point3f localP = po;
+    Vector3f localW = wo;
     const Eigen::Vector3f inPos(localP.x, localP.y, localP.z);
     const Eigen::Vector3f inDir(localW.x, localW.y, localW.z);
 
@@ -65,14 +69,6 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
 
     Float kernelEps = PolyUtils::GetKernelEps(mAvgMedium, channel, this->mKernelEpsScale);
     Float fitScaleFactor = PolyUtils::GetFitScaleFactor(kernelEps);
-
-    // FeatureModel<3>::PreprocessFeatureShape preprocessFeatures =
-    //         featureModel->GetPreprocessFeature(mediumParas.albedo, mediumParas.g, mediumParas.eta, mediumParas.sigmaT,
-    //                                            fitScaleFactor, shapeCoeffEigen);
-    // FeatureModel<3>::FeatureShape features = featureModel->Run(preprocessFeatures);
-
-    // Float absorption = absorptionModel->Run(features);
-    // Eigen::Vector3f outPos = scatterModel->Run(features);
 
 
     Float absorption;
@@ -86,6 +82,9 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     sRec.throughout = Spectrum(1.0f - absorption);
 
     // FIXME: Need to modify?
+
+    const Eigen::Vector3f worldInPos(po.x, po.y, po.z);
+    const Eigen::Vector3f worldInDir(wo.x, wo.y, wo.z);
     // outPos = NetworkUtils::LocalToWorld(worldInPos, -worldInDir, outPos, true);
     // outPos = worldInPos + (outPos - worldInPos) / sigmaT.Average();
     outPos = inPos + (outPos - inPos) / sigmaT.Average();
@@ -94,8 +93,8 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
 
 
     // FIXME: Apply tranform here?
-    Transform asTransformInv = Inverse(asTransform);
-    sampledP = asTransformInv(sampledP);
+    // Transform asTransformInv = Inverse(asTransform);
+    // sampledP = asTransformInv(sampledP);
 
     // sRec.w = Vector3f(1.0, 0, 0); // FIXME
 
