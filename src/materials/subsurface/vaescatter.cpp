@@ -8,19 +8,15 @@
 
 #include "vaescatter.h"
 #include "reflection.h"
-#include "vaehandlereigen.h"
 #include "sampler.h"
 #include "stats.h"
 #include "scene.h"
+#include <cmath>
 
 namespace pbrt {
 
-
 VaeScatter::~VaeScatter() {
-    // FIXME: Not sure if delete here is ok?
-    // if (po.polyStorage) {
-    //     delete po.polyStorage;
-    // }
+
 }
 
 
@@ -35,14 +31,13 @@ Spectrum VaeScatter::S(const SurfaceInteraction &pi, const Vector3f &wi) {
 Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                               MemoryArena &arena, SurfaceInteraction *si,
                               Float *pdf) const {
-    // TODO: 采样 S 函数的值，将其储存于 pdf 和 si 中, 並初始化完成 VAE 模式的 BSDF
     ProfilePhase pp(Prof::BSSRDFSampling);
     Vector3f refractedD = -this->po.wo; // FIXME: -
-    // Ray zeroScatterRay(this->po.p, refractedD); // - refracted?
-    // SurfaceInteraction zeroScatterIts;
-    // if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
-    //     return Spectrum(0.0f);
-    // }
+    Ray zeroScatterRay(this->po.p, refractedD); // - refracted?
+    SurfaceInteraction zeroScatterIts;
+    if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
+        return Spectrum(0.0f);
+    }
     // TODO: consider ray passes through situation.
 
     Spectrum Sp = Sample_Sp(scene, refractedD, si, pdf, 3);
@@ -69,9 +64,11 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, Sur
                     inDir, this->po, 3, PolyUtils::GetFitScaleFactor(mVaeHandler->GetMedium(), i), i);
             sRecs[i] = mVaeHandler->Sample(po, wo, &scene, polyNormal, sigmaT, albedo,
                                            this->g, this->eta, this->po, true, i, &res[i]);
-            Spectrum tmp = sRecs[i].throughout;
-            sRecs[i].throughout = Spectrum(0.0f);
-            sRecs[i].throughout[i] = tmp[i] * 3.0f;
+
+            // FIXME: Don't filter throughout
+            // Spectrum tmp = sRecs[i].throughout;
+            // sRecs[i].throughout = Spectrum(0.0f);
+            // sRecs[i].throughout[i] = tmp[i] * 3.0f;
         }
     } else {
         CHECK_EQ(nSamples, 1);
@@ -105,7 +102,14 @@ Spectrum VaeScatter::Sample_Sp(const Scene &scene, const Vector3f &refractedD,
         res += s.throughout;
         *resIsect = sIsect[i];
     }
-    *pdf = 1.0f; // FIXME: Maybe the pdf need to be calculated
+
+    const Point3f &p1 = resIsect->p, &p2 = this->po.p;
+    const Float dist = (p1 - p2).Length();
+
+    // FIXME: Find a better way to calculate the pdf. Or no need of PDF?
+    // *pdf = 1.0f * dist;
+    *pdf = 1.0f * std::exp(dist); // Looks somehow good.
+    // *pdf = 1.0f;
     return res / (Float) nSamples;
 }
 

@@ -102,6 +102,13 @@ void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::ve
     int pointsNum = sampledP.size();
     mTree = CTree(pointsNum);
     LOG(INFO) << "Build constraint kd tree: " << pointsNum;
+
+#ifdef VISUALIZE_SHAPE_DATA
+    {
+        // FIXME: visualize KD tree.
+        const std::string &fileName = "../data/kdtree.txt";
+    }
+#endif
     ParallelFor([&](int64_t i) {
         mTree[i].SetPosition(sampledP[i]);
         ExtraData d;
@@ -156,9 +163,11 @@ ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
     std::vector<Point3f> positions;
     std::vector<Normal3f> normals;
     std::vector<Float> sampleWeights;
-    GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
 
-    // Add the super constraints
+    GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
+    std::cout << "Constraints num: " << positions.size() << "/" << mPoints.size() << std::endl;
+
+    // // Add the super constraints
     for (size_t i = 0; i < mPoints.size(); ++i) {
         positions.push_back(mPoints[i]);
         normals.push_back(mNormals[i]);
@@ -167,13 +176,15 @@ ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
     return std::make_tuple(positions, normals, sampleWeights);
 }
 
-void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pbrt::ConstraintKDTree::ExtraData> node,
-                                      TreeNode::IndexType index, const Bounds3f &aabb, std::vector<Point3f> &points,
+void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f,
+        pbrt::ConstraintKDTree::ExtraData> node,
+                                      TreeNode::IndexType index, const Bounds3f &aabb,
+                                      std::vector<Point3f> &points,
                                       std::vector<Normal3f> &normals, std::vector<Float> &sampleWeights,
                                       pbrt::Float kernelEps,
                                       const std::function<Float(Float, Float)> &kernelFunc) const {
-    Float dist2Threshold = 9.0 * kernelEps;
-    Float distSq =pbrt::DistanceSquared(p, aabb);
+    Float dist2Threshold = 9.0f * kernelEps; // FIXME: Adjust a better threshold.
+    Float distSq = pbrt::DistanceSquared(p, aabb);
     if (distSq > dist2Threshold) {
         return;
     }
@@ -198,14 +209,28 @@ void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f, pb
     Bounds3f rightBounds(rightMin, rightMax);
     if (mTree.HasRightChild(index)) {
         auto rightIdx = node.GetRightIndex(index);
-        if (rightIdx != index)
-            GetConstraints(p, mTree[rightIdx], rightIdx, rightBounds, points, normals, sampleWeights, kernelEps,
-                           kernelFunc);
+        // if (rightIdx != index)
+        GetConstraints(p, mTree[rightIdx], rightIdx, rightBounds,
+                       points, normals, sampleWeights, kernelEps, kernelFunc);
     }
     // Node always has left child by construction
     auto leftIdx = node.GetLeftIndex(index);
-    if(leftIdx != index)
-        GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
+    GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
+
+#ifdef VISUALIZE_SHAPE_DATA
+    {
+        // FIXME: Make visualize a parameter
+        std::ofstream file;
+        const std::string fileName = "../data/constraintpct.txt";
+        file.open(fileName, std::ios::app);
+        DCHECK(file.is_open());
+        auto r = GetRandomFloat(), g = GetRandomFloat(), b = GetRandomFloat();
+        for (auto &p: points) {
+            file << p.x << " " << p.y << " " << p.z << " " << r << " " << g << " " << b << std::endl;
+        }
+        file.close();
+    }
+#endif
 }
 
 Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
@@ -224,13 +249,18 @@ Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
     return kernelMultiplier * 4.0f * val * val / (sigmaTp * sigmaTp);
 }
 
+// FIXME: Use kdtree
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
+// PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
+PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord,
+                         const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     if (polyFitRecord.config.hardSurfaceConstraint) {
         if (polyFitRecord.config.order == 2) {
-            return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
+            // return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
+            return FitPolynomialImpl<2, true>(polyFitRecord, points, normals);
         } else {
-            return FitPolynomialImpl<3, true>(polyFitRecord, kdTree);
+            // return FitPolynomialImpl<3, true>(polyFitRecord, kdTree);
+            return FitPolynomialImpl<3, true>(polyFitRecord, points, normals);
         }
     } else {
         LOG(ERROR) << "Polynomial without hard surface constraint is unsupported.";
@@ -240,7 +270,9 @@ PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDT
 
 template<size_t polyOrder, bool hardSurfaceConstraint>
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
+// PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
+PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec,
+                             const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     Float kernelEps = pfRec.kernelEps;
     std::function<Float(Float, Float)> kernelFunc = PolyUtils::GaussianKernel;
     std::vector<Point3f> posConstraints;
@@ -248,10 +280,27 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
     std::vector<Float> sampleWeights;
 
     // Problems may come from here.
-    std::tie(posConstraints, normConstraints, sampleWeights) = kdTree->GetConstraints(pfRec.p, kernelEps, kernelFunc);
+    // FIXME: Use kdtree instead
+    // std::tie(posConstraints, normConstraints, sampleWeights) = kdTree->GetConstraints(pfRec.p, kernelEps, kernelFunc);
+    std::tie(posConstraints, normConstraints, sampleWeights) = PolyUtils::GetConstraints(pfRec.p, kernelEps, points, normals);
+
+#ifdef VISUALIZE_SHAPE_DATA
+    {
+        // FIXME: Visualize constraints
+        std::cout << "collecting constraints" << std::endl;
+        const std::string &fileName = "../data/constraints.txt";
+        std::ofstream file;
+        file.open(fileName, std::ios::app);
+        file << pfRec.p.x << " " << pfRec.p.y << " " << pfRec.p.z << " " << 1.0 << " " << 0 << " " << 0 << std::endl;
+        for(auto &p: posConstraints) {
+            file << p.x << " " << p.y << " " << p.z << " " << 0 << " " << 1.0 << " " << 0 << std::endl;
+        }
+        file.close();
+    }
+#endif
 
     size_t n = posConstraints.size();
-    float invSqrtN = 1.0f / std::sqrt(n);
+    Float invSqrtN = 1.0f / std::sqrt(n);
 
     Eigen::VectorXf weights(n);
     Vector3f s, t;
@@ -403,11 +452,11 @@ std::pair<float, Vector3f> EvalPolyGrad(const Point3f &pos,
                 int pY = permY[termIdx];
                 int pZ = permZ[termIdx];
                 if (pX > 0)
-                    deriv.x += ((float)dx + 1.0f) * t * coeffs[pX];
+                    deriv.x += ((float) dx + 1.0f) * t * coeffs[pX];
                 if (pY > 0)
-                    deriv.y += ((float)dy + 1.0f) * t * coeffs[pY];
+                    deriv.y += ((float) dy + 1.0f) * t * coeffs[pY];
                 if (pZ > 0)
-                    deriv.z += ((float)dz + 1.0f) * t * coeffs[pZ];
+                    deriv.z += ((float) dz + 1.0f) * t * coeffs[pZ];
                 ++termIdx;
             }
         }
@@ -426,7 +475,7 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
     Float dists[2] = {2 * kernelEps, std::numeric_limits<Float>::infinity()};
 
     // FIXME: Adjust the dir.
-    if(dir.Length() < 1e-8) {
+    if (dir.Length() < 1e-8) {
         rec.isValid = false;
         return;
     }

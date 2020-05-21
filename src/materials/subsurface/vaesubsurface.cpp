@@ -71,6 +71,7 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
 void VAESubsurface::PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes,
                                     const ParamSet &params) {
     Material::PrepareMaterial(shapes, params);
+    ProfilePhase p(Prof::MaterialPreparation);
     PolyUtils::PolyFitConfig pfConfig; // FIXME: I just use default here, remember to make use of params
     mVaeHandler->Prepare(shapes, pfConfig);
     LOG(INFO) << "Finish preparing the material.";

@@ -14,6 +14,7 @@
 #include "network_utils.h"
 #include "parallel.h"
 #include <random>
+#include <fstream>
 #include <ctime>
 
 
@@ -88,31 +89,51 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
         sampledP.push_back(isect.p);
         sampledN.push_back(isect.n);
     }
+
+#ifdef VISUALIZE_SHAPE_DATA
+    {
+        // FIXME: Visualize the constraints
+        const std::string fileName = "../data/pointcloud.txt";
+        std::ofstream file;
+        file.open(fileName);
+        DCHECK(file.is_open());
+        for(Point3f &p: sampledP) {
+            file << p.x << " " << p.y << " " << p.z << " " << 0 << " " << 0 << " " << 1.0 << std::endl;
+        }
+        file.close();
+    }
+#endif
+
     // 2. Build a constraint KD-tree to accelerate the precomputation. Only computed once before rendering.
     // mKDTrees[channel].push_back(ConstraintKDTree());
     // mKDTrees[channel].back().Build(sampledP, sampledN);
-    ConstraintKDTree kdTree;
-    kdTree.Build(sampledP, sampledN);
+    // FIXME: Use kd tree
+    // ConstraintKDTree kdTree;
+    // kdTree.Build(sampledP, sampledN);
 
     if (!triMesh->HasPolyCoeffs())
         triMesh->CreatePolyCoeffs();
     PolyStorage *polyCoeffs = triMesh->GetPolyeffs();
 
-    DCHECK(triMesh->n != NULL);
+    // DCHECK(triMesh->n != NULL);
 
     // 3. Fit the polynomials in surrounding by solving the 20 * 20 linear systems.
+    bool hasN = triMesh->n != NULL;
     ParallelFor([&](int64_t i) {
         PolyUtils::PolyFitRecord pfRec;
         pfRec.p = triMesh->p[i];
-        pfRec.d = Vector3f(triMesh->n[i]);
-        pfRec.n = triMesh->n[i];
+        // FIXME: Should write a better solution for no N version.
+        pfRec.d = hasN ? Vector3f(triMesh->n[i]) : Vector3f(1, 0, 0);
+        pfRec.n = hasN ? triMesh->n[i] : Normal3f(1, 0, 0);
         pfRec.kernelEps = kernelEps;
         pfRec.config = pfConfig;
         pfRec.config.useLightspace = false;
         PolyUtils::Polynomial res;
         std::vector<Point3f> pts;
         std::vector<Normal3f> dirs;
-        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
+        // FIXME: no kd tree
+        // std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
+        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, sampledP, sampledN);
         for (int k = 0; k < res.coeffs.size(); k++) {
             polyCoeffs[i].coeffs[channel][k] = res.coeffs[k];
             polyCoeffs[i].kernelEps[channel] = kernelEps;

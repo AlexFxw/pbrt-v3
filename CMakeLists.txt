@@ -25,6 +25,15 @@ ENDIF()
 ENABLE_TESTING()
 
 ###########################################################################
+# Visualizing VAE related files
+# OPTION(VISUALIZE_SHAPE_DATA "Visual the data in shape-adpative rendering" ON)
+SET(VISUALIZE_SHAPE_DATA OFF)
+IF(VISUALIZE_SHAPE_DATA)
+  ADD_DEFINITIONS( -D VISUALIZE_SHAPE_DATA)
+ENDIF()
+
+
+###########################################################################
 # GDB
 # SET(CMAKE_BUILD_TYPE "Debug")
 SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
@@ -564,9 +573,6 @@ ADD_SANITIZERS ( obj2pbrt )
 
 ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
-
-ADD_EXECUTABLE ( tf_utils train_utils/generator.cpp )
-TARGET_LINK_LIBRARIES ( tf_utils ${TF_LIB})
 
 # Unit test
 

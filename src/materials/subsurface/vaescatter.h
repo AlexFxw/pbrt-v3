@@ -61,7 +61,6 @@ public:
 
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const override {
         Spectrum f = bssrdf->Sw(wi);
-        // FIXME: No Sw now.
         if (bssrdf->mode == TransportMode::Radiance)
             f *= bssrdf->eta * bssrdf->eta;
         return f;

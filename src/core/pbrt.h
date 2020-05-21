@@ -50,6 +50,7 @@
 #include <string>
 #include <vector>
 #include "error.h"
+#include <fstream>
 
 #ifdef PBRT_HAVE_MALLOC_H
 #include <malloc.h>  // for _alloca, memalign

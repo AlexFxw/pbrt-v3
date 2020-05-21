@@ -90,6 +90,9 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     // outPos = worldInPos + (outPos - worldInPos) / sigmaT.Average();
     outPos = inPos + (outPos - inPos) / sigmaT.Average();
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
+
+
+
     // FIXME: Apply tranform here?
     Transform asTransformInv = Inverse(asTransform);
     sampledP = asTransformInv(sampledP);
@@ -102,14 +105,27 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     //     return sRec;
     // }
     // Project the sampled points to the surface.
-    if(mConfig.predictionSpace == "AS") {
+    if (mConfig.predictionSpace == "AS") {
         PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
                                           mConfig.polyOrder, false, fitScaleFactor, kernelEps, res);
-    }
-    else {
+    } else {
         PolyUtils::ProjectPointsToSurface(scene, po, -wo, sRec, shapeCoeffEigen,
-                                          mConfig.polyOrder, mConfig.predictionSpace == "LS", fitScaleFactor, kernelEps, res);
+                                          mConfig.polyOrder, mConfig.predictionSpace == "LS", fitScaleFactor, kernelEps,
+                                          res);
     }
+#ifdef VISUALIZE_SHAPE_DATA
+    {
+        // FIXME: To visualize scatter point
+        const std::string fileName = "../data/scatterpos.txt";
+        std::ofstream file;
+        file.open(fileName, std::ios::app);
+        DCHECK(file.is_open());
+        file << sampledP.x << " " << sampledP.y << " " << sampledP.z << " " << 0 << " " << 1.0 << " " << 0 << std::endl;
+        file << po.x << " " << po.y << " " << po.z << " " << 1.0 << " " << 0 << " " << 0 << std::endl;
+        auto &p = res->p;
+        file << p.x << " " << p.y << " " << p.z << " " << 0 << " " << 0 << " " << 1.0 << std::endl;
+    }
+#endif
     return sRec;
 }
 

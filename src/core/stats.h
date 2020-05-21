@@ -145,6 +145,9 @@ enum class Prof {
     TextureLoading,
     MIPMapCreation,
 
+    // Add some profile for shape-adaptive rendering
+    MaterialPreparation,
+
     IntegratorRender,
     SamplerIntegratorLi,
     SPPMCameraPass,
@@ -199,6 +202,8 @@ static const char *ProfNames[] = {
     "Acceleration structure creation",
     "Texture loading",
     "MIP map generation",
+
+    "Material Preparation",
 
     "Integrator::Render()",
     "SamplerIntegrator::Li()",

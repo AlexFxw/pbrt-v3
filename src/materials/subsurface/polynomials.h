@@ -77,24 +77,13 @@ class PointKDTree {
 public:
     typedef typename NodeType::IndexType IndexType;
 
-    struct SearchResult {
-        Float distSquared;
-        IndexType index;
-
-        SearchResult() {}
-
-        SearchResult(Float distSquared, IndexType index) : distSquared(distSquared), index(index) {}
-
-        bool operator==(const SearchResult &r) const {
-            return distSquared == r.distSquared && index == r.index;
-        }
-    };
-
-    PointKDTree(size_t nodes = 0) : mNodes(nodes), mDepth(0) {}
+    PointKDTree(size_t nodes = 0) : mNodes(nodes), mDepth(0) {
+        mAABB = Bounds3f(Point3f(), Point3f());
+    }
 
     void Clear() {
         mNodes.clear();
-        mAABB = Bounds3f();
+        mAABB = Bounds3f(Point3f(), Point3f());
     }
 
     inline void Resize(size_t size) { mNodes.resize(size); }
@@ -104,7 +93,9 @@ public:
     inline const NodeType &operator[](size_t idx) const { return mNodes[idx]; }
 
     inline bool HasRightChild(IndexType index) const {
-        return mNodes[index].GetRightIndex(index) != 0;
+        // return mNodes[index].GetRightIndex(index) != 0;
+        auto rightIndex = mNodes[index].GetRightIndex(index);
+        return rightIndex != 0 && rightIndex != index;
     }
 
     void PushBack(const NodeType &node) {
@@ -124,7 +115,8 @@ public:
                 mAABB = pbrt::Union(mAABB, iter->pos);
             }
         }
-        std::vector<IndexType> indirection(mNodes.size());
+        int mNodeSize = mNodes.size();
+        std::vector<IndexType> indirection(mNodeSize);
         for (size_t i = 0; i < mNodes.size(); i++) {
             indirection[i] = (IndexType) i;
         }
@@ -157,7 +149,7 @@ public:
         } else {
             splitNode.SetRightIndex((IndexType) (rangeStart - base), 0);
         }
-        splitNode.SetLeftIndex((IndexType)(rangeStart - base), (IndexType)(rangeStart + 1 -base));
+        splitNode.SetLeftIndex((IndexType) (rangeStart - base), (IndexType) (rangeStart + 1 - base));
         std::iter_swap(rangeStart, split);
 
         Float tmp = mAABB.pMax[axis], splitPos = splitNode.pos[axis];
@@ -202,7 +194,9 @@ public:
     };
 
     typedef SimpleKDNode<Point3f, ExtraData> TreeNode;
+
     typedef PointKDTree<SimpleKDNode<Point3f, ExtraData>> CTree;
+
     void Build(const std::vector<Point3f> &sampledP, const std::vector<Normal3f> &sampledN);
     std::tuple<std::vector<Point3f>, std::vector<Normal3f>, std::vector<Float>>
     GetConstraints(const Point3f &p, Float kernelEps, const std::function<Float(Float, Float)> &kernel) const;
@@ -227,6 +221,7 @@ public:
         float regularization = 0.0001f;
         bool useSvd = false;
         bool useLightspace = true;
+        bool visualize = false;
         int order = 3;
         bool hardSurfaceConstraint = true;
         float globalConstraintWeight = 0.01f;
@@ -263,7 +258,7 @@ public:
 
         /// Convert from local coordinates to world coordinates
         inline Vector3f toWorld(const Vector3f &v) const {
-            return s * v.x + t * v.y + Vector3f( n) * v.z;
+            return s * v.x + t * v.y + Vector3f(n) * v.z;
         }
     };
 
@@ -303,12 +298,16 @@ public:
         return hardSurfaceConstraint ? nChooseK(3 + polyOrder, polyOrder) - 1 : nChooseK(3 + polyOrder, polyOrder);
     }
 
+    // FIXME: use kd tree
     static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-    FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree);
+    // FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree);
+    FitPolynomial(const PolyFitRecord &polyFitRecord, const std::vector<Point3f> &points, const std::vector<Normal3f> &normals);
 
+    // FIXME: use kd tree
     template<size_t polyOrder, bool hardSurfaceConstraint = true>
     static std::tuple<Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-    FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree);
+    // FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree);
+    FitPolynomialImpl(const PolyFitRecord &pfRec, const std::vector<Point3f> &points, const std::vector<Normal3f> &normals);
 
     static void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
         float sign = copysignf(1.0f, n.z);
@@ -428,6 +427,33 @@ public:
 
     static Normal3f AdjustRayDirForPolynomialTracing(Vector3f &inDir, const SurfaceInteraction &isect,
                                                      int polyOrder, Float polyScaleFactor, int channel);
+
+
+    //FIXME: Just for debug, brute force method
+    static std::tuple<std::vector<Point3f>, std::vector<Normal3f>, std::vector<Float>>
+    GetConstraints(const Point3f &p, Float kernelEps,
+                   const std::vector<Point3f> &points, const std::vector<Normal3f> normals) {
+        std::vector<Point3f> pointConstraints;
+        std::vector<Normal3f> normalConstraints;
+        std::vector<Float> weightConstraints;
+        Float dist2Threshold = 9.0f * kernelEps; // FIXME: Adjust a better threshold.
+        for (size_t i = 0; i < points.size(); i++) {
+            Float distSq = pbrt::DistanceSquared(p, points[i]);
+            if (distSq < dist2Threshold) {
+                pointConstraints.push_back(points[i]);
+                normalConstraints.push_back(normals[i]);
+                weightConstraints.push_back(1.0f);
+            }
+        }
+
+        for (size_t i = 0; i < 32; i++) {
+            pointConstraints.push_back(points[i]);
+            normalConstraints.push_back(normals[i]);
+            weightConstraints.push_back(-1.0f);
+        }
+
+        return std::make_tuple(pointConstraints, normalConstraints, weightConstraints);
+    }
 
 protected:
     static inline Float GaussianKernel(Float dist2, Float sigma2) {
