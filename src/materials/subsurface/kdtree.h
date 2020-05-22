@@ -167,8 +167,6 @@ private:
                         std::vector<Float> &weights, Float kernelEps) const {
         Float dist2Threshold = 9.0 * kernelEps;
 
-        auto d = DistanceSquared(p, aabb);
-
         if (DistanceSquared(p, aabb) > dist2Threshold) {
             return;
         }

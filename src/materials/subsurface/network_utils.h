@@ -84,116 +84,6 @@ public:
     }
 };
 
-template<size_t PolyOrder, size_t LayerWidth, size_t FeatureDim>
-class FeatureModel {
-public:
-    typedef Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(PolyOrder), 1> ShapeVector;
-    typedef Eigen::Matrix<float, NetworkUtils::nInFeatures(PolyOrder), 1> PreprocessFeatureShape;
-    typedef Eigen::Matrix<float, FeatureDim, 1> FeatureShape;
-
-    FeatureModel() {}
-
-    FeatureModel(const std::string &variablePath, const nlohmann::json &stats,
-                 const std::string &shapeFeaturesName) {
-        shapemlp_fcn_0_biases = NetworkUtils::LoadVectorDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_0_biases.bin");
-        shapemlp_fcn_1_biases = NetworkUtils::LoadVectorDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_1_biases.bin");
-        shapemlp_fcn_2_biases = NetworkUtils::LoadVectorDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_2_biases.bin");
-        shapemlp_fcn_0_weights = NetworkUtils::LoadMatrixDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_0_weights.bin");
-        shapemlp_fcn_1_weights = NetworkUtils::LoadMatrixDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_1_weights.bin");
-        shapemlp_fcn_2_weights = NetworkUtils::LoadMatrixDynamic(
-                variablePath + "/shared_preproc_mlp_2_shapemlp_fcn_2_weights.bin");
-        m_gMean = stats["g_mean"][0];
-        m_gStdInv = stats["g_stdinv"][0];
-        m_albedoMean = stats["effAlbedo_mean"][0];
-        m_albedoStdInv = stats["effAlbedo_stdinv"][0];
-        std::string degStr = std::to_string(PolyOrder);
-        for (int i = 0; i < NetworkUtils::nPolyCoeffs(PolyOrder); ++i) {
-            m_shapeFeatMean[i] = stats[shapeFeaturesName + "_mean"][i];
-            m_shapeFeatStdInv[i] = stats[shapeFeaturesName + "_stdinv"][i];
-        }
-    }
-
-    FeatureShape
-    Run(const Eigen::Matrix<float, NetworkUtils::nInFeatures(PolyOrder), 1> &x) const {
-        Eigen::Matrix<float, LayerWidth, 1> features =
-                (shapemlp_fcn_0_weights * x + shapemlp_fcn_0_biases).cwiseMax(0.0f);
-        features = (shapemlp_fcn_1_weights * features + shapemlp_fcn_1_biases).cwiseMax(0.0f);
-        features = (shapemlp_fcn_2_weights * features + shapemlp_fcn_2_biases).cwiseMax(0.0f);
-        return features;
-    }
-
-    PreprocessFeatureShape GetPreprocessFeature(const Spectrum &albedo, float g, float ior, const Spectrum &sigmaT,
-                                                float polyScaleFactor, const ShapeVector &polyCoeffs) {
-        Eigen::Matrix<float, NetworkUtils::nInFeatures(PolyOrder), 1> x =
-                NetworkUtils::PreprocessFeatures<PolyOrder, false>(albedo, g, ior, sigmaT, polyCoeffs, m_albedoMean,
-                                                                   m_albedoStdInv,
-                                                                   m_gMean, m_gStdInv, m_shapeFeatMean,
-                                                                   m_shapeFeatStdInv);
-        return x;
-    }
-
-private:
-    Eigen::Matrix<float, LayerWidth, NetworkUtils::nInFeatures(PolyOrder)> shapemlp_fcn_0_weights;
-    Eigen::Matrix<float, LayerWidth, LayerWidth> shapemlp_fcn_1_weights;
-    Eigen::Matrix<float, LayerWidth, LayerWidth> shapemlp_fcn_2_weights;
-    Eigen::Matrix<float, LayerWidth, 1> shapemlp_fcn_0_biases;
-    Eigen::Matrix<float, LayerWidth, 1> shapemlp_fcn_1_biases;
-    Eigen::Matrix<float, LayerWidth, 1> shapemlp_fcn_2_biases;
-    Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(PolyOrder), 1> m_shapeFeatMean, m_shapeFeatStdInv;
-    float m_albedoMean, m_albedoStdInv, m_gMean, m_gStdInv;
-};
-
-template<size_t PolyOrder, size_t LayerWidth, size_t FeatureDim>
-class AbsorptionModel {
-public:
-    typedef Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(PolyOrder), 1> ShapeVector;
-
-    AbsorptionModel() {}
-
-    // AbsorptionModel(const std::string &variablePath, const VaeConfig &config) {
-    AbsorptionModel(const std::string &variablePath, const nlohmann::json &stats,
-                    const std::string &shapeFeaturesName) {
-        absorption_mlp_fcn_0_biases = NetworkUtils::LoadVectorDynamic(
-                variablePath + "/absorption_mlp_fcn_0_biases.bin");
-        absorption_dense_bias = NetworkUtils::LoadVectorDynamic(variablePath + "/absorption_dense_bias.bin");
-        auto tmp = NetworkUtils::LoadMatrixDynamic(variablePath + "/absorption_mlp_fcn_0_weights.bin");
-        absorption_mlp_fcn_0_weights = tmp;
-        absorption_dense_kernel = NetworkUtils::LoadMatrixDynamic(variablePath + "/absorption_dense_kernel.bin");
-
-        m_gMean = stats["g_mean"][0];
-        m_gStdInv = stats["g_stdinv"][0];
-        m_albedoMean = stats["effAlbedo_mean"][0];
-        m_albedoStdInv = stats["effAlbedo_stdinv"][0];
-        std::string degStr = std::to_string(PolyOrder);
-        for (int i = 0; i < NetworkUtils::nPolyCoeffs(PolyOrder); ++i) {
-            m_shapeFeatMean[i] = stats[shapeFeaturesName + "_mean"][i];
-            m_shapeFeatStdInv[i] = stats[shapeFeaturesName + "_stdinv"][i];
-        }
-    }
-
-    Float Run(const Eigen::Matrix<float, FeatureDim, 1> &features) const {
-        Eigen::Matrix<float, LayerWidth, 1> x =
-                (absorption_mlp_fcn_0_weights * features + absorption_mlp_fcn_0_biases).cwiseMax(0.0f);
-        Eigen::Matrix<float, 1, 1> x2 = absorption_dense_kernel * x + absorption_dense_bias;
-        return NetworkUtils::sigmoid(x2[0]);
-    }
-
-    Eigen::Matrix<float, LayerWidth, 1> absorption_mlp_fcn_0_biases;
-    Eigen::VectorXf absorption_dense_bias;
-
-    Eigen::Matrix<float, LayerWidth, FeatureDim> absorption_mlp_fcn_0_weights;
-    Eigen::Matrix<float, 1, LayerWidth> absorption_dense_kernel;
-
-    ShapeVector m_shapeFeatMean, m_shapeFeatStdInv;
-    float m_albedoMean, m_albedoStdInv, m_gMean, m_gStdInv;
-
-    // EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
 
 template<size_t PolyOrder, size_t PreLayerWidth>
 class ScatterModelBase {
@@ -208,72 +98,6 @@ public:
     virtual ~ScatterModelBase() {}
 };
 
-/*
-template<size_t PolyOrder, size_t NLatent, size_t LayerWidth, size_t PreLayerWidth>
-class ScatterModel : public ScatterModelBase<PolyOrder, PreLayerWidth> {
-public:
-ScatterModel() {}
-
-ScatterModel(const std::string &variablePath, const nlohmann::json &stats,
-             const std::string &shapeFeaturesName,
-             const std::string &predictionSpace = "LS") {
-
-    scatter_decoder_fcn_fcn_0_biases = NetworkUtils::LoadVectorDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_0_biases.bin");
-    scatter_decoder_fcn_fcn_1_biases = NetworkUtils::LoadVectorDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_1_biases.bin");
-    scatter_decoder_fcn_fcn_2_biases = NetworkUtils::LoadVectorDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_2_biases.bin");
-    scatter_dense_2_bias = NetworkUtils::LoadVectorDynamic(variablePath + "/scatter_dense_2_bias.bin");
-    scatter_decoder_fcn_fcn_0_weights = NetworkUtils::LoadMatrixDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_0_weights.bin");
-    scatter_decoder_fcn_fcn_1_weights = NetworkUtils::LoadMatrixDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_1_weights.bin");
-    scatter_decoder_fcn_fcn_2_weights = NetworkUtils::LoadMatrixDynamic(
-            variablePath + "/scatter_decoder_fcn_fcn_2_weights.bin");
-    scatter_dense_2_kernel = NetworkUtils::LoadMatrixDynamic(variablePath + "/scatter_dense_2_kernel.bin");
-    for (int i = 0; i < 3; ++i) {
-        m_outPosMean[i] = stats["outPosRel" + predictionSpace + "_mean"][i];
-        m_outPosStd[i] = 1.0f / float(stats["outPosRel" + predictionSpace + "_stdinv"][i]);
-    }
-}
-
-Eigen::Vector3f
-Run(const Eigen::Matrix<float, PreLayerWidth, 1> &features) const override {
-
-    // Concatenate features with random numbers
-    Eigen::Matrix<float, NLatent, 1> latent(NLatent);
-    NetworkUtils::SampleGaussianVector(latent.data(), NLatent);
-
-    Eigen::Matrix<float, PreLayerWidth + NLatent, 1> featLatent;
-    featLatent << latent, features;
-    Eigen::Matrix<float, LayerWidth, 1> y =
-            (scatter_decoder_fcn_fcn_0_weights * featLatent + scatter_decoder_fcn_fcn_0_biases).cwiseMax(0.0f);
-
-    y = (scatter_decoder_fcn_fcn_1_weights * y + scatter_decoder_fcn_fcn_1_biases).cwiseMax(0.0f);
-    y = (scatter_decoder_fcn_fcn_2_weights * y + scatter_decoder_fcn_fcn_2_biases).cwiseMax(0.0f);
-    Eigen::Vector3f outPos = scatter_dense_2_kernel * y + scatter_dense_2_bias;
-    outPos = outPos.cwiseProduct(m_outPosStd) + m_outPosMean;
-    return outPos;
-}
-
-private:
-// Public member variables.
-Eigen::Matrix<float, LayerWidth, 1> scatter_decoder_fcn_fcn_0_biases;
-Eigen::Matrix<float, LayerWidth, 1> scatter_decoder_fcn_fcn_1_biases;
-Eigen::Matrix<float, LayerWidth, 1> scatter_decoder_fcn_fcn_2_biases;
-Eigen::Matrix<float, 3, 1> scatter_dense_2_bias;
-
-Eigen::Matrix<float, LayerWidth, PreLayerWidth + NLatent> scatter_decoder_fcn_fcn_0_weights;
-Eigen::Matrix<float, LayerWidth, LayerWidth> scatter_decoder_fcn_fcn_1_weights;
-Eigen::Matrix<float, LayerWidth, LayerWidth> scatter_decoder_fcn_fcn_2_weights;
-Eigen::Matrix<float, 3, LayerWidth> scatter_dense_2_kernel;
-
-Eigen::Vector3f m_outPosMean, m_outPosStd;
-
-// EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-};
- */
 
 template<size_t PolyOrder, size_t NLatent, size_t LayerWidth, size_t PreLayerWidth>
 class ScatterModelSimShared : public ScatterModelBase<PolyOrder> {
@@ -367,16 +191,12 @@ public:
         Eigen::Matrix<float, 1, 1> a = absorption_dense_kernel * absTmp + absorption_dense_bias;
         Float absorption = NetworkUtils::sigmoid(a[0]);
 
-        // FIXME: Do not filter the absorption
         Float randFloat = GetRandomFloat();
         if (randFloat > absorption) {
             absorption = 0.0f; // nothing gets absorbed instead
         } else {
             return std::make_pair(inPos, 1.0f); // all is absorbed
         }
-        // if (1.0f - absorption < 1e-3) {
-        //     return std::make_pair(inPos, 1.0f); // all is absorbed
-        // }
 
         // Concatenate features with random numbers
         Eigen::Matrix<float, NLatent, 1> latent(NLatent);

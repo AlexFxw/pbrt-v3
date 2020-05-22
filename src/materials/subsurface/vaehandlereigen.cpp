@@ -15,18 +15,6 @@ int VaeHandlerEigen::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes,
                              const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
     VaeHandler::Prepare(shapes, pfConfig);
     const std::string shapeFeatureName = "mlsPolyLS3";
-
-    // featureModel = std::unique_ptr<FeatureModel<3>>(new FeatureModel<3>(
-    //         mScatterVariableDir, mConfig.stats, shapeFeatureName
-    // ));
-
-    // scatterModel = std::unique_ptr<ScatterModelBase<3>>(new ScatterModel<3>(
-    //         mScatterVariableDir, mConfig.stats, shapeFeatureName
-    // ));
-
-    // absorptionModel = std::unique_ptr<AbsorptionModel<3>>(new AbsorptionModel<3>(
-    //         mAbsVariableDir, mConfig.stats, shapeFeatureName
-    // ));
     scatterModel = std::unique_ptr<ScatterModelBase<3>>(new ScatterModelSimShared<3>(
             mScatterVariableDir, mAbsVariableDir, mConfig.stats, shapeFeatureName
     ));
@@ -40,28 +28,21 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
                                               const Spectrum &albedo, Float g, Float eta,
                                               const SurfaceInteraction &isect,
                                               bool projectSamples, int channel, SurfaceInteraction *res) const {
-    FeatureModel<3>::ShapeVector shapeCoeffEigen;
-    FeatureModel<3>::ShapeVector shapeCoeffEigenWs;
+    typedef Eigen::Matrix<float, NetworkUtils::nPolyCoeffs(3), 1> ShapeVector;
+    ShapeVector shapeCoeffEigen;
+    ShapeVector shapeCoeffEigenWs;
     Transform asTransform;
 
-    // TODO: prediction scope
     const Float *coeffs = isect.GetPolyCoeffs(channel);
     for (int i = 0; i < shapeCoeffEigenWs.size(); i++) {
         shapeCoeffEigenWs[i] = coeffs[i];
     }
-    // Calculate the polynomial coefficients
-    // FIXME: Should I apply transform here?
-    // std::tie(shapeCoeffEigen, asTransform) = VaeHandler::GetPolyCoeffsAs<3>(po, wo, polyNormal, isect, channel);
 
     shapeCoeffEigen = VaeHandler::GetPolyCoeffsEigen<3>(po, wo, polyNormal, &isect,
                                                         mConfig.predictionSpace == "LS", channel);
 
-    // Point3f localP = asTransform(po);
-    // Vector3f localW = asTransform(wo);
-    Point3f localP = po;
-    Vector3f localW = wo;
-    const Eigen::Vector3f inPos(localP.x, localP.y, localP.z);
-    const Eigen::Vector3f inDir(localW.x, localW.y, localW.z);
+    const Eigen::Vector3f inPos(po.x, po.y, po.z);
+    const Eigen::Vector3f inDir(wo.x, wo.y, wo.z);
 
     Spectrum albedoChannel(albedo[channel]);
     Spectrum sigmaTChannel(sigmaT[channel]);
@@ -70,33 +51,16 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
     Float kernelEps = PolyUtils::GetKernelEps(mAvgMedium, channel, this->mKernelEpsScale);
     Float fitScaleFactor = PolyUtils::GetFitScaleFactor(kernelEps);
 
-
     Float absorption;
     Eigen::Vector3f outPos;
-    // FIXME: not using medium paras
-    // std::tie(outPos, absorption) = scatterModel->Run(inPos, inDir, mediumParas.albedo, mediumParas.g, mediumParas.eta,
-    //                                                  mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
     std::tie(outPos, absorption) = scatterModel->Run(inPos, inDir, mediumParas.albedo, g, eta,
                                                      mediumParas.sigmaT, fitScaleFactor, shapeCoeffEigen, asTransform);
     ScatterSamplingRecord sRec;
     sRec.throughout = Spectrum(1.0f - absorption);
 
-    // FIXME: Need to modify?
 
-    const Eigen::Vector3f worldInPos(po.x, po.y, po.z);
-    const Eigen::Vector3f worldInDir(wo.x, wo.y, wo.z);
-    // outPos = NetworkUtils::LocalToWorld(worldInPos, -worldInDir, outPos, true);
-    // outPos = worldInPos + (outPos - worldInPos) / sigmaT.Average();
     outPos = inPos + (outPos - inPos) / sigmaT.Average();
     Point3f sampledP(outPos[0], outPos[1], outPos[2]);
-
-
-
-    // FIXME: Apply tranform here?
-    // Transform asTransformInv = Inverse(asTransform);
-    // sampledP = asTransformInv(sampledP);
-
-    // sRec.w = Vector3f(1.0, 0, 0); // FIXME
 
     sRec.p = sampledP;
     sRec.isValid = absorption < 1.0f;
@@ -112,7 +76,7 @@ ScatterSamplingRecord VaeHandlerEigen::Sample(const Point3f &po, const Vector3f 
                                           mConfig.polyOrder, mConfig.predictionSpace == "LS", fitScaleFactor, kernelEps,
                                           res);
     }
-#ifdef VISUALIZE_SHAPE_DATA
+#ifdef VISUALIZE_SCATTER
     {
         // FIXME: To visualize scatter point
         const std::string fileName = "../data/scatterpos.txt";

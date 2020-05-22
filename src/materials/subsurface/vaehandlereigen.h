@@ -28,8 +28,6 @@ public:
 
 private:
     std::unique_ptr<ScatterModelBase<3>> scatterModel;
-    // std::unique_ptr<FeatureModel<3>> featureModel;
-    // std::unique_ptr<AbsorptionModel<3>> absorptionModel;
     Spectrum mEffectiveAlbedo;
     Float mKernelEpsScale;
     std::string mAbsVariableDir, mScatterVariableDir;

@@ -70,12 +70,11 @@ void VaeHandler::PrecomputePolynomials(const std::vector<std::shared_ptr<Shape>>
 void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Shape>> &shapes, int channel,
                                            const pbrt::MediumParameters &mediumPara,
                                            const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
-    // FIXME: Seems to be wrong here.
     // 1. Sampling max{1024, 2\sigma_n^2 * SurfaceArea} points around the neighborhood.
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
     std::shared_ptr<TriangleMesh> triMesh(PreprocessTriangles(shapes));
     int nSamples = std::max(int(triMesh->Area() * 2.0f / kernelEps), 1024);
-    nSamples = std::min(nSamples, 100000); // FIXME: Adjust the kernel eps instead.
+    nSamples = std::min(nSamples, 1000000); // FIXME: Adjust the kernel eps instead.
     std::vector<Point3f> sampledP;
     std::vector<Normal3f> sampledN;
 
@@ -92,7 +91,6 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
 
 #ifdef VISUALIZE_SHAPE_DATA
     {
-        // FIXME: Visualize the constraints
         const std::string fileName = "../data/pointcloud.txt";
         std::ofstream file;
         file.open(fileName);
@@ -105,9 +103,6 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
 #endif
 
     // 2. Build a constraint KD-tree to accelerate the precomputation. Only computed once before rendering.
-    // mKDTrees[channel].push_back(ConstraintKDTree());
-    // mKDTrees[channel].back().Build(sampledP, sampledN);
-    // FIXME: Use kd tree
     ConstraintKDTree kdTree(sampledP.size());
     kdTree.Build(sampledP, sampledN);
 
@@ -118,10 +113,8 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     // 3. Fit the polynomials in surrounding by solving the 20 * 20 linear systems.
     bool hasN = triMesh->n != NULL;
     ParallelFor([&](int64_t i) {
-        // printf("Fitting polynomial of vertix %d/%d\n", i, triMesh->nVertices);
         PolyUtils::PolyFitRecord pfRec;
         pfRec.p = triMesh->p[i];
-        // FIXME: Should write a better solution for no N version.
         pfRec.d = hasN ? Vector3f(triMesh->n[i]) : Vector3f(1, 0, 0);
         pfRec.n = hasN ? triMesh->n[i] : Normal3f(1, 0, 0);
         pfRec.kernelEps = kernelEps;
@@ -130,9 +123,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
         PolyUtils::Polynomial res;
         std::vector<Point3f> pts;
         std::vector<Normal3f> dirs;
-        // FIXME: no kd tree
         std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
-        // std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, sampledP, sampledN);
         for (int k = 0; k < res.coeffs.size(); k++) {
             polyCoeffs[i].coeffs[channel][k] = res.coeffs[k];
             polyCoeffs[i].kernelEps[channel] = kernelEps;

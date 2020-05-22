@@ -114,11 +114,8 @@ Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
     return kernelMultiplier * 4.0f * val * val / (sigmaTp * sigmaTp);
 }
 
-// FIXME: Use kdtree
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
 PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
-// PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord,
-//                          const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     if (polyFitRecord.config.hardSurfaceConstraint) {
         if (polyFitRecord.config.order == 2) {
             return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
@@ -136,8 +133,6 @@ PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDT
 template<size_t polyOrder, bool hardSurfaceConstraint>
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
 PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
-// PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec,
-//                              const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     Float kernelEps = pfRec.kernelEps;
     std::function<Float(Float, Float)> kernelFunc = PolyUtils::GaussianKernel;
     std::vector<Point3f> posConstraints;
@@ -148,8 +143,6 @@ PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree 
 
 #ifdef VISUALIZE_SHAPE_DATA
     {
-        // FIXME: Visualize constraints
-        // std::cout << "collecting constraints" << std::endl;
         const std::string &fileName = "../data/constraints.txt";
         std::ofstream file;
         file.open(fileName, std::ios::app);
@@ -334,7 +327,7 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
         return;
 
     Vector3f dir = EvaluateGradient(refPoint, polyCoefficients, rec, polyOrder, scaleFactor, useLocalDir, refDir);
-    Float dists[2] = {2 * kernelEps, std::numeric_limits<Float>::infinity()};
+    Float dists[2] = {2 * kernelEps, Infinity};
 
     // FIXME: Adjust the dir.
     if (dir.Length() < 1e-8) {
@@ -345,7 +338,7 @@ void PolyUtils::ProjectPointsToSurface(const Scene *scene, const Point3f &refPoi
 
     for (int i = 0; i < 2; i++) {
         Float maxDist = dists[i];
-        Ray r1(rec.p, dir); // FIXME: Add maxDist?
+        Ray r1(rec.p, dir); // FIXME: Max distance affects the appearance a lot.
         SurfaceInteraction its, its2;
         Point3f projectedP;
         Normal3f normal;
@@ -394,7 +387,6 @@ PolyUtils::EvaluateGradient(const Point3f &pos, const Eigen::VectorXf &coeffs, c
         PolyUtils::Frame local(s, t, Normal3f(refDir));
         gradient = local.toWorld(gradient);
     }
-    // FIXME: May be bug here.
     return gradient;
 }
 

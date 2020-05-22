@@ -20,7 +20,6 @@ namespace pbrt {
 VaeScatter::~VaeScatter() {}
 
 Spectrum VaeScatter::S(const SurfaceInteraction &pi, const Vector3f &wi) {
-    // FIXME: Direct copy yet.
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
     return (1 - Ft) * Sw(wi);  // No sp here.
@@ -30,8 +29,8 @@ Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                               MemoryArena &arena, SurfaceInteraction *si,
                               Float *pdf) const {
     ProfilePhase pp(Prof::BSSRDFSampling);
-    Vector3f refractedD = -this->po.wo;          // FIXME: -
-    Ray zeroScatterRay(this->po.p, refractedD);  // - refracted?
+    Vector3f refractedD = -this->po.wo;
+    Ray zeroScatterRay(this->po.p, refractedD);
     SurfaceInteraction zeroScatterIts;
     if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
         return Spectrum(0.0f);
@@ -85,7 +84,6 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene,
 Spectrum VaeScatter::Sample_Sp(const Scene &scene, const Vector3f &refractedD,
                                SurfaceInteraction *resIsect, Float *pdf,
                                int nSamples) const {
-    // FIXME: Check the calculation of Sp function
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     ScatterSamplingRecord sRecs[nSamples];
     DCHECK_GE(nSamples, 0);
@@ -107,9 +105,9 @@ Spectrum VaeScatter::Sample_Sp(const Scene &scene, const Vector3f &refractedD,
     const Point3f &p1 = resIsect->p, &p2 = this->po.p;
     const Float dist = (p1 - p2).Length();
 
-    // FIXME: Find a better way to calculate the pdf. Or no need of PDF?
-    // *pdf = 1.0f * dist;
-    *pdf = 1.0f * std::exp(dist);  // Looks good.
+    // TODO: Find a better way to calculate the pdf. Or no need of PDF?
+    // *pdf = 1.0f;
+    *pdf = 2 * std::exp(dist);  // Looks good.
     return res / (Float)nSamples;
 }
 
