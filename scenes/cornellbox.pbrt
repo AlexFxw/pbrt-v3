@@ -2,7 +2,7 @@ Integrator "path" "integer maxdepth" [ 10 ]
 Transform [ 1 -0 -0 -0 -0 1 -0 -0 -0 -0 -1 -0 -0 -1 6.8 1]
 Sampler "sobol" "integer pixelsamples" [ 512 ]
 PixelFilter "triangle" "float xwidth" [ 1.000000 ] "float ywidth" [ 1.000000 ] 
-Film "image" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ] "string filename" [ "images/cornellbox-vae-512.exr" ]
+Film "image" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ] "string filename" [ "images/cornellbox-vae.png" ]
 Camera "perspective" "float fov" [ 19.500000 ]
 WorldBegin
 	MakeNamedMaterial "LeftWall" "string type" [ "matte" ] "rgb Kd" [ 0.630000 0.065000 0.050000 ] 

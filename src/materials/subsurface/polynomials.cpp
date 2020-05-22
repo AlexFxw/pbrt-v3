@@ -98,141 +98,6 @@ Eigen::VectorXi DerivPermutationEigen(size_t degree, size_t axis) {
 }
 
 
-void ConstraintKDTree::Build(const std::vector<Point3f> &sampledP, const std::vector<Normal3f> &sampledN) {
-    int pointsNum = sampledP.size();
-    mTree = CTree(pointsNum);
-    LOG(INFO) << "Build constraint kd tree: " << pointsNum;
-
-#ifdef VISUALIZE_SHAPE_DATA
-    {
-        // FIXME: visualize KD tree.
-        const std::string &fileName = "../data/kdtree.txt";
-    }
-#endif
-    ParallelFor([&](int64_t i) {
-        mTree[i].SetPosition(sampledP[i]);
-        ExtraData d;
-        d.p = sampledP[i];
-        d.n = sampledN[i];
-        d.sampledNum = 1;
-        d.avgN = Normal3f(-10, -10, -10);
-        d.avgP = Point3f(-100, -100, -100);
-        mTree[i].SetData(d);
-    }, pointsNum, 1024);
-    mTree.Build(true);
-    CalcAvgValues(mTree[0], 0);
-    LOG(INFO) << "Calculated the average value";
-
-    for (size_t i = 0; i < std::min(size_t(32), sampledP.size()); i++) {
-        mPoints.push_back(sampledP[i]);
-        mNormals.push_back(sampledN[i]);
-    }
-}
-
-std::tuple<Point3f, Normal3f, size_t> ConstraintKDTree::CalcAvgValues(TreeNode &node, TreeNode::IndexType index) {
-    LOG(INFO) << "Calculating average value of index: " << index;
-    Point3f rp, lp;
-    Normal3f rn, ln;
-    size_t rSamples = 0, lSamples = 0;
-    if (mTree.HasRightChild(index)) {
-        auto rightIdx = node.GetRightIndex(index);
-        if (index != rightIdx)
-            std::tie(rp, rn, rSamples) = CalcAvgValues(mTree[rightIdx], rightIdx);
-    }
-
-    if (!node.IsLeaf()) {
-        auto leftIdx = node.GetLeftIndex(index);
-        if (index != leftIdx)
-            std::tie(lp, ln, lSamples) = CalcAvgValues(mTree[leftIdx], leftIdx);
-    }
-
-    size_t allSamples = lSamples + rSamples + 1;
-    Point3f avgP = (node.GetData().p + ((Float) rSamples) * rp + ((Float) lSamples) * lp) / ((Float) allSamples);
-    Normal3f avgN = (node.GetData().n + ((Float) rSamples) * rn + ((Float) lSamples) * ln) / ((Float) allSamples);
-
-    node.GetData().avgP = avgP;
-    node.GetData().avgN = avgN;
-    node.GetData().sampledNum = allSamples;
-    return std::make_tuple(avgP, avgN, allSamples);
-}
-
-std::tuple<std::vector<Point3f>, std::vector<Normal3f>, std::vector<Float>>
-ConstraintKDTree::GetConstraints(const Point3f &p, Float kernelEps,
-                                 const std::function<Float(Float, Float)> &kernel) const {
-    // Extract constraints from KD Tree by traversing from the top
-    std::vector<Point3f> positions;
-    std::vector<Normal3f> normals;
-    std::vector<Float> sampleWeights;
-
-    GetConstraints(p, mTree[0], 0, mTree.GetAABB(), positions, normals, sampleWeights, kernelEps, kernel);
-    std::cout << "Constraints num: " << positions.size() << "/" << mPoints.size() << std::endl;
-
-    // // Add the super constraints
-    for (size_t i = 0; i < mPoints.size(); ++i) {
-        positions.push_back(mPoints[i]);
-        normals.push_back(mNormals[i]);
-        sampleWeights.push_back(-1.0f);
-    }
-    return std::make_tuple(positions, normals, sampleWeights);
-}
-
-void ConstraintKDTree::GetConstraints(const Point3f &p, SimpleKDNode<Point3f,
-        pbrt::ConstraintKDTree::ExtraData> node,
-                                      TreeNode::IndexType index, const Bounds3f &aabb,
-                                      std::vector<Point3f> &points,
-                                      std::vector<Normal3f> &normals, std::vector<Float> &sampleWeights,
-                                      pbrt::Float kernelEps,
-                                      const std::function<Float(Float, Float)> &kernelFunc) const {
-    Float dist2Threshold = 9.0f * kernelEps; // FIXME: Adjust a better threshold.
-    Float distSq = pbrt::DistanceSquared(p, aabb);
-    if (distSq > dist2Threshold) {
-        return;
-    }
-    if (distSq < dist2Threshold) {
-        points.push_back(node.GetData().p);
-        normals.push_back(node.GetData().n);
-        sampleWeights.push_back(1.0f);
-    }
-
-    if (node.IsLeaf())
-        return;
-
-    // Compute bounding box of child nodes
-    uint16_t ax = node.GetAxis();
-    Point3f leftMin = aabb.pMin;
-    Point3f leftMax = aabb.pMax;
-    leftMax[ax] = node.GetPos()[ax];
-    Point3f rightMin = aabb.pMin;
-    Point3f rightMax = aabb.pMax;
-    rightMin[ax] = node.GetPos()[ax];
-    Bounds3f leftBounds(leftMin, leftMax);
-    Bounds3f rightBounds(rightMin, rightMax);
-    if (mTree.HasRightChild(index)) {
-        auto rightIdx = node.GetRightIndex(index);
-        // if (rightIdx != index)
-        GetConstraints(p, mTree[rightIdx], rightIdx, rightBounds,
-                       points, normals, sampleWeights, kernelEps, kernelFunc);
-    }
-    // Node always has left child by construction
-    auto leftIdx = node.GetLeftIndex(index);
-    GetConstraints(p, mTree[leftIdx], leftIdx, leftBounds, points, normals, sampleWeights, kernelEps, kernelFunc);
-
-#ifdef VISUALIZE_SCATTER
-    {
-        // FIXME: Make visualize a parameter
-        std::ofstream file;
-        const std::string fileName = "../data/constraintpct.txt";
-        file.open(fileName, std::ios::app);
-        DCHECK(file.is_open());
-        auto r = GetRandomFloat(), g = GetRandomFloat(), b = GetRandomFloat();
-        for (auto &p: points) {
-            file << p.x << " " << p.y << " " << p.z << " " << r << " " << g << " " << b << std::endl;
-        }
-        file.close();
-    }
-#endif
-}
-
 Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
                               pbrt::Float kernelMultiplier) {
     // The kernel epsilon size is related to the medium's properties
@@ -251,16 +116,16 @@ Float PolyUtils::GetKernelEps(const MediumParameters &mediumParas, int channel,
 
 // FIXME: Use kdtree
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-// PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
-PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord,
-                         const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
+PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord, const ConstraintKDTree *kdTree) {
+// PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord,
+//                          const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     if (polyFitRecord.config.hardSurfaceConstraint) {
         if (polyFitRecord.config.order == 2) {
-            // return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
-            return FitPolynomialImpl<2, true>(polyFitRecord, points, normals);
+            return FitPolynomialImpl<2, true>(polyFitRecord, kdTree);
+            // return FitPolynomialImpl<2, true>(polyFitRecord, points, normals);
         } else {
-            // return FitPolynomialImpl<3, true>(polyFitRecord, kdTree);
-            return FitPolynomialImpl<3, true>(polyFitRecord, points, normals);
+            return FitPolynomialImpl<3, true>(polyFitRecord, kdTree);
+            // return FitPolynomialImpl<3, true>(polyFitRecord, points, normals);
         }
     } else {
         LOG(ERROR) << "Polynomial without hard surface constraint is unsupported.";
@@ -270,24 +135,21 @@ PolyUtils::FitPolynomial(const PolyFitRecord &polyFitRecord,
 
 template<size_t polyOrder, bool hardSurfaceConstraint>
 std::tuple<PolyUtils::Polynomial, std::vector<Point3f>, std::vector<Normal3f>>
-// PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
-PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec,
-                             const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
+PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec, const ConstraintKDTree *kdTree) {
+// PolyUtils::FitPolynomialImpl(const PolyFitRecord &pfRec,
+//                              const std::vector<Point3f> &points, const std::vector<Normal3f> &normals) {
     Float kernelEps = pfRec.kernelEps;
     std::function<Float(Float, Float)> kernelFunc = PolyUtils::GaussianKernel;
     std::vector<Point3f> posConstraints;
     std::vector<Normal3f> normConstraints;
     std::vector<Float> sampleWeights;
 
-    // Problems may come from here.
-    // FIXME: Use kdtree instead
-    // std::tie(posConstraints, normConstraints, sampleWeights) = kdTree->GetConstraints(pfRec.p, kernelEps, kernelFunc);
-    std::tie(posConstraints, normConstraints, sampleWeights) = PolyUtils::GetConstraints(pfRec.p, kernelEps, points, normals);
+    std::tie(posConstraints, normConstraints, sampleWeights) = kdTree->GetConstraints(pfRec.p, kernelEps);
 
 #ifdef VISUALIZE_SHAPE_DATA
     {
         // FIXME: Visualize constraints
-        std::cout << "collecting constraints" << std::endl;
+        // std::cout << "collecting constraints" << std::endl;
         const std::string &fileName = "../data/constraints.txt";
         std::ofstream file;
         file.open(fileName, std::ios::app);

@@ -2,38 +2,36 @@
  * @Author: Hsuan-Wei Fan
  * @Date: 2020-04-23 13:47:13
  * @LastEditors: Hsuan-Wei Fan
- * @LastEditTime: 2020-04-23 13:50:48
+ * @LastEditTime: 2020-05-22 11:04:14
  * @Description: The definition of vae subsurface scattering material.
  */
 
 #include "vaescatter.h"
+
+#include <cmath>
+
 #include "reflection.h"
 #include "sampler.h"
-#include "stats.h"
 #include "scene.h"
-#include <cmath>
+#include "stats.h"
 
 namespace pbrt {
 
-VaeScatter::~VaeScatter() {
-
-}
-
+VaeScatter::~VaeScatter() {}
 
 Spectrum VaeScatter::S(const SurfaceInteraction &pi, const Vector3f &wi) {
     // FIXME: Direct copy yet.
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
-    return (1 - Ft) * Sw(wi); // No sp here.
+    return (1 - Ft) * Sw(wi);  // No sp here.
 }
-
 
 Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                               MemoryArena &arena, SurfaceInteraction *si,
                               Float *pdf) const {
     ProfilePhase pp(Prof::BSSRDFSampling);
-    Vector3f refractedD = -this->po.wo; // FIXME: -
-    Ray zeroScatterRay(this->po.p, refractedD); // - refracted?
+    Vector3f refractedD = -this->po.wo;          // FIXME: -
+    Ray zeroScatterRay(this->po.p, refractedD);  // - refracted?
     SurfaceInteraction zeroScatterIts;
     if (!scene.Intersect(zeroScatterRay, &zeroScatterIts)) {
         return Spectrum(0.0f);
@@ -41,7 +39,7 @@ Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
     // TODO: consider ray passes through situation.
 
     Spectrum Sp = Sample_Sp(scene, refractedD, si, pdf, 3);
-    if (!Sp.IsBlack()) { // FIXME: valid intersection.
+    if (!Sp.IsBlack()) {  // FIXME: valid intersection.
         si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
         si->bsdf->Add(ARENA_ALLOC(arena, VaeScatterAdapter)(this));
         si->wo = Vector3f(si->shading.n);
@@ -50,22 +48,23 @@ Spectrum VaeScatter::Sample_S(const Scene &scene, Float u1, const Point2f &u2,
     return Sp;
 }
 
-void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, SurfaceInteraction *res,
-                           const Vector3f &w, int nSamples) const {
+void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene,
+                           SurfaceInteraction *res, const Vector3f &w,
+                           int nSamples) const {
     const Point3f &po = this->po.p;
     const Vector3f &wo = this->po.wo;
-    // TODO: Compute albedo
+    // TODO: Add albedo texture.
     const Spectrum &albedo = mVaeHandler->GetMedium().albedo;
     const Spectrum &sigmaT = mVaeHandler->GetMedium().sigmaT;
     Vector3f inDir = -w;
     if (nSamples == 3) {
         for (int i = 0; i < 3; i++) {
             Normal3f polyNormal = PolyUtils::AdjustRayDirForPolynomialTracing(
-                    inDir, this->po, 3, PolyUtils::GetFitScaleFactor(mVaeHandler->GetMedium(), i), i);
-            sRecs[i] = mVaeHandler->Sample(po, wo, &scene, polyNormal, sigmaT, albedo,
-                                           this->g, this->eta, this->po, true, i, &res[i]);
-
-            // FIXME: Don't filter throughout
+                inDir, this->po, 3,
+                PolyUtils::GetFitScaleFactor(mVaeHandler->GetMedium(), i), i);
+            sRecs[i] = mVaeHandler->Sample(po, wo, &scene, polyNormal, sigmaT,
+                                           albedo, this->g, this->eta, this->po,
+                                           true, i, &res[i]);
             // Spectrum tmp = sRecs[i].throughout;
             // sRecs[i].throughout = Spectrum(0.0f);
             // sRecs[i].throughout[i] = tmp[i] * 3.0f;
@@ -75,15 +74,17 @@ void VaeScatter::Sample_Pi(ScatterSamplingRecord *sRecs, const Scene &scene, Sur
         // Choose a random color channel to sample
         int channel = int(3 * pbrt::GetRandomFloat());
         Normal3f polyNormal = PolyUtils::AdjustRayDirForPolynomialTracing(
-                inDir, this->po, 3, PolyUtils::GetFitScaleFactor(mVaeHandler->GetMedium()), channel);
-        sRecs[0] = mVaeHandler->Sample(po, wo, &scene, polyNormal, sigmaT, albedo,
-                                       this->g, this->eta, this->po, true, channel, res);
+            inDir, this->po, 3,
+            PolyUtils::GetFitScaleFactor(mVaeHandler->GetMedium()), channel);
+        sRecs[0] = mVaeHandler->Sample(po, wo, &scene, polyNormal, sigmaT,
+                                       albedo, this->g, this->eta, this->po,
+                                       true, channel, res);
     }
 }
 
 Spectrum VaeScatter::Sample_Sp(const Scene &scene, const Vector3f &refractedD,
-                               SurfaceInteraction *resIsect,
-                               Float *pdf, int nSamples) const {
+                               SurfaceInteraction *resIsect, Float *pdf,
+                               int nSamples) const {
     // FIXME: Check the calculation of Sp function
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     ScatterSamplingRecord sRecs[nSamples];
@@ -108,10 +109,8 @@ Spectrum VaeScatter::Sample_Sp(const Scene &scene, const Vector3f &refractedD,
 
     // FIXME: Find a better way to calculate the pdf. Or no need of PDF?
     // *pdf = 1.0f * dist;
-    *pdf = 1.0f * std::exp(dist); // Looks somehow good.
-    // *pdf = 1.0f;
-    return res / (Float) nSamples;
+    *pdf = 1.0f * std::exp(dist);  // Looks good.
+    return res / (Float)nSamples;
 }
 
-
-} // namespace pbrt
+}  // namespace pbrt

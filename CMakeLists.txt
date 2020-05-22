@@ -27,10 +27,7 @@ ENABLE_TESTING()
 ###########################################################################
 # Visualizing VAE related files
 # OPTION(VISUALIZE_SHAPE_DATA "Visual the data in shape-adpative rendering" ON)
-SET(VISUALIZE_SHAPE_DATA OFF)
-IF(VISUALIZE_SHAPE_DATA)
-  ADD_DEFINITIONS( -D VISUALIZE_SHAPE_DATA)
-ENDIF()
+# ADD_DEFINITIONS( -D VISUALIZE_SHAPE_DATA)
 # ADD_DEFINITIONS(-D VISUALIZE_SCATTER)
 
 

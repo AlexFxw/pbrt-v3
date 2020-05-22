@@ -108,8 +108,8 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
     // mKDTrees[channel].push_back(ConstraintKDTree());
     // mKDTrees[channel].back().Build(sampledP, sampledN);
     // FIXME: Use kd tree
-    // ConstraintKDTree kdTree;
-    // kdTree.Build(sampledP, sampledN);
+    ConstraintKDTree kdTree(sampledP.size());
+    kdTree.Build(sampledP, sampledN);
 
     if (!triMesh->HasPolyCoeffs())
         triMesh->CreatePolyCoeffs();
@@ -131,8 +131,8 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
         std::vector<Point3f> pts;
         std::vector<Normal3f> dirs;
         // FIXME: no kd tree
-        // std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
-        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, sampledP, sampledN);
+        std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, &kdTree);
+        // std::tie(res, pts, dirs) = PolyUtils::FitPolynomial(pfRec, sampledP, sampledN);
         for (int k = 0; k < res.coeffs.size(); k++) {
             polyCoeffs[i].coeffs[channel][k] = res.coeffs[k];
             polyCoeffs[i].kernelEps[channel] = kernelEps;
