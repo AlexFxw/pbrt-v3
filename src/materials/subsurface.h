@@ -59,7 +59,8 @@ public:
                        const std::shared_ptr<Texture<Float>> &uRoughness,
                        const std::shared_ptr<Texture<Float>> &vRoughness,
                        const std::shared_ptr<Texture<Float>> &bumpMap,
-                       bool remapRoughness)
+                       bool remapRoughness,
+                       const std::shared_ptr<Texture<Spectrum>> &scatterDistance)
             : scale(scale),
               Kr(Kr),
               Kt(Kt),
@@ -70,6 +71,7 @@ public:
               bumpMap(bumpMap),
               eta(eta),
               remapRoughness(remapRoughness),
+              scatterDistance(scatterDistance),
               table(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
@@ -84,6 +86,7 @@ protected:
     std::shared_ptr<Texture<Spectrum>> Kr, Kt, sigma_a, sigma_s;
     std::shared_ptr<Texture<Float>> uRoughness, vRoughness;
     std::shared_ptr<Texture<Float>> bumpMap;
+    std::shared_ptr<Texture<Spectrum>> scatterDistance;
     const Float eta;
     const bool remapRoughness;
 

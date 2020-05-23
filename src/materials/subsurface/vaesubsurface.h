@@ -24,7 +24,8 @@ public:
                   const std::shared_ptr<Texture<Float>> &bumpMap,
                   bool remapRoughness) :
             SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s,
-                               g, eta, uRoughness, vRoughness, bumpMap, remapRoughness), mVaeHandler(nullptr) {}
+                               g, eta, uRoughness, vRoughness, bumpMap, remapRoughness, nullptr), mVaeHandler(nullptr) {}
+                               //FIXME: Should not be nullptr here
 
 
     void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena,

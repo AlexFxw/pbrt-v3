@@ -39,6 +39,7 @@
 #include "interpolation.h"
 #include "paramset.h"
 #include "interaction.h"
+#include "subsurface/normal_diffusion.h"
 
 namespace pbrt {
 
@@ -91,10 +92,15 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
                     T, distrib, 1.f, eta, mode));
         }
     }
+#ifdef USE_NORMALIZE_DIFFUSE
+    Spectrum d = scatterDistance->Evaluate(*si);
+    si->bssrdf = ARENA_ALLOC(arena, NormalDiffusion)(d, *si, eta, this, mode);
+#else
     Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
     Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
     si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
                                                      sig_a, sig_s, table);
+#endif
 }
 
 SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
@@ -129,9 +135,12 @@ SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
         mp.GetFloatTexture("vroughness", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
         mp.GetFloatTextureOrNull("bumpmap");
+
+    std::shared_ptr<Texture<Spectrum>> scatterDistance =
+            mp.GetSpectrumTexture("scatterdistance", Spectrum(0.));
     bool remapRoughness = mp.FindBool("remaproughness", true);
     return new SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
-                                  roughu, roughv, bumpMap, remapRoughness);
+                                  roughu, roughv, bumpMap, remapRoughness, scatterDistance);
 }
 
 }  // namespace pbrt

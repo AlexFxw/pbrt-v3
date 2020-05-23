@@ -93,7 +93,6 @@ protected:
 private:
     static void OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2);
     static Transform AzimuthSpaceTransform(const Vector3f &lightDir, const Normal3f &normal);
-    static std::shared_ptr<TriangleMesh> PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes);
 
 
 };

@@ -114,7 +114,7 @@ public:
     // reference point p.
     Float SolidAngle(const Point3f &p, int nSamples = 0) const;
 
-    friend class VaeHandler;
+    friend class Utils;
 
 private:
     // Triangle Private Methods

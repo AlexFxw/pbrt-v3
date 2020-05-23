@@ -11,6 +11,7 @@
 #include "transform.h"
 #include "sampling.h"
 #include "shapes/triangle.h"
+#include "utils.h"
 #include "network_utils.h"
 #include "parallel.h"
 #include <random>
@@ -72,7 +73,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
                                            const pbrt::PolyUtils::PolyFitConfig &pfConfig) {
     // 1. Sampling max{1024, 2\sigma_n^2 * SurfaceArea} points around the neighborhood.
     Float kernelEps = PolyUtils::GetKernelEps(mediumPara, channel, pfConfig.kernelEpsScale);
-    std::shared_ptr<TriangleMesh> triMesh(PreprocessTriangles(shapes));
+    std::shared_ptr<TriangleMesh> triMesh(Utils::PreprocessTriangles(shapes));
     int nSamples = std::max(int(triMesh->Area() * 2.0f / kernelEps), 1024);
     nSamples = std::min(nSamples, 1000000); // FIXME: Adjust the kernel eps instead.
     std::vector<Point3f> sampledP;
@@ -133,25 +134,7 @@ void VaeHandler::PrecomputePolynomialsImpl(const std::vector<std::shared_ptr<Sha
 }
 
 
-std::shared_ptr<TriangleMesh> VaeHandler::PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes) {
-    // "shapes" is the collection of triangles.
-    // Initialize triangle mesh's area distribution here.
-    Float areaSum = 0.0f;
-    size_t shapesNum = shapes.size();
-    DCHECK_GT(shapesNum, 0);
-    Float areas[shapesNum];
-    for (size_t i = 0; i < shapesNum; i++) {
-        areas[i] = shapes[i]->Area();
-        areaSum += areas[i];
-    }
-    auto tmp = shapes.back();
-    std::shared_ptr<Triangle> triangleIter(std::dynamic_pointer_cast<Triangle>(shapes.back()));
-    std::shared_ptr<TriangleMesh> triMesh(triangleIter->mesh);
-    triMesh->areaDistri = new Distribution1D(areas, shapesNum);
-    triMesh->area = areaSum;
-    triMesh->invArea = 1.0f / areaSum;
-    return triMesh;
-}
+
 
 void VaeHandler::OnbDuff(const Normal3f &n, Vector3f &b1, Vector3f &b2) {
     float sign = copysignf(1.0f, n.z);

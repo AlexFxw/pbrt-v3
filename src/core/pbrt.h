@@ -212,6 +212,8 @@ struct Distribution1D;
 
 class Distribution2D;
 
+class Utils;
+
 #ifdef PBRT_FLOAT_AS_DOUBLE
 typedef double Float;
 #else
