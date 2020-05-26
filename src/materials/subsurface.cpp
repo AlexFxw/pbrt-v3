@@ -41,6 +41,7 @@
 #include "interaction.h"
 #include "subsurface/normal_diffusion.h"
 #include "subsurface/twopass_dipole.h"
+#include "subsurface/classical_dipole.h"
 
 namespace pbrt {
 
@@ -94,16 +95,18 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
         }
     }
 
+    Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
+    Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
     if (method == SSS_METHOD::NORMAL_DIFFUSION) {
         Spectrum d = scatterDistance->Evaluate(*si);
         si->bssrdf = ARENA_ALLOC(arena, NormalDiffusion)(R, d, *si, eta, this, mode);
     } else if (method == SSS_METHOD::DEFAULT) {
-        Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
-        Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
         si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
                                                          sig_a, sig_s, table);
     } else if(method == SSS_METHOD::TWO_PASS) {
         si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, twopassHelper);
+    } else if(method == SSS_METHOD::CLASSIC) {
+        si->bssrdf = ARENA_ALLOC(arena, ClassicalBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g);
     }
 }
 
@@ -158,6 +161,8 @@ SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
         sss_method = SSS_METHOD::NORMAL_DIFFUSION;
     } else if (method == "two_pass") {
         sss_method = SSS_METHOD::TWO_PASS;
+    } else if(method == "classic") {
+        sss_method = SSS_METHOD::CLASSIC;
     }
     return new SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
                                   roughu, roughv, bumpMap, remapRoughness, scatterDistance, sss_method);

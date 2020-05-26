@@ -174,10 +174,10 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                                                BSDF_ALL, &flags);
                 if (f.IsBlack() || pdf == 0) break;
 
-                if (!isect.bssrdf->ContainSingleScattering()) {
+                //if (!isect.bssrdf->ContainSingleScattering()) {
                     // Normal diffusion do not need single scatter term
                     beta *= f * AbsDot(wi, pi.shading.n) / pdf;
-                }
+                // }
 
                 DCHECK(!std::isinf(beta.y()));
                 specularBounce = (flags & BSDF_SPECULAR) != 0;

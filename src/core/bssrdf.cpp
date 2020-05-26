@@ -341,7 +341,8 @@ Spectrum SeparableBSSRDF::Sample_Sp(const Scene &scene, Float u1,
     // Compute sample PDF and return the spatial BSSRDF term $\Sp$
     *pdf = this->Pdf_Sp(*pi) / nFound;
 #endif
-    return this->Sp(*pi);
+    Spectrum res = this->Sp(*pi);
+    return res;
 }
 
 Float SeparableBSSRDF::Pdf_Sp(const SurfaceInteraction &pi) const {

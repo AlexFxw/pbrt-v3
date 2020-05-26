@@ -74,15 +74,25 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *b
                 visualizedWo = true;
             }
 #endif
-            Spectrum directRadiance = UniformSampleOneLight(tmp, scene, arena, randomSampler);
+            // Spectrum directRadiance = UniformSampleOneLight(tmp, scene, arena, randomSampler);
 
             // Spectrum directRadiance = integrator->Li(RayDifferential(tmp.p, tmp.wo), scene,
             //                                          randomSampler, arena, 0);
-            // const auto &lights = scene.lights;
-            // const int index = Clamp((int) (randomSampler.Get1D() * lights.size()), 0, lights.size());
-            // const auto &light = *lights[index];
-            // Spectrum directRadiance = EstimateDirect(tmp, randomSampler.Get2D(), light, sobolSampler.Get2D(),
-            //                                           scene, sobolSampler, arena);
+            const auto &lights = scene.lights;
+            const int index = Clamp((int) (randomSampler.Get1D() * lights.size()), 0, lights.size());
+            const auto &light = *lights[index];
+            Ray r, probeRay;
+            Normal3f nLight;
+            Float pdfPos, pdfDir, pdf;
+            Spectrum e = light.Sample_Le(randomSampler.Get2D(), randomSampler.Get2D(),
+                                         tmp.time, &r, &nLight, &pdfPos, &pdfDir);
+
+            Vector3f wo = tmp.p - probeRay.o, wi;
+            tmp.bsdf->Sample_f(wo, &wi,randomSampler.Get2D(), &pdf);
+            tmp.wo = wo;
+
+            Spectrum directRadiance = EstimateDirect(tmp, randomSampler.Get2D(), light, randomSampler.Get2D(),
+                                                     scene, randomSampler, arena, false, true) * pdf;
             // Spectrum directRadiance = IrradianceCache(scene, tmp.p, randomSampler, arena);
 
             {

@@ -1649,11 +1649,11 @@ inline Vector3f SampleAzimuthVector(const Vector3f &normal, const Point2f &u) {
     // std::cout << u << res << std::endl;
     // res = (ss * std::sqrt(1 - r2)) + (ns * std::cos(r1) * r2s) + (ts * std::sin(r1) * r2s);
     // res = Vector3f(GetRandomFloat(), GetRandomFloat(), GetRandomFloat());
-    // Point2f p = RandPoint2f();
-    // Float x = p.x < 0.5f ? u.x : -u.x;
-    // Float y = p.y < 0.5f ? u.y : -u.y;
-    // res = ns + x * ss + y * ts;
-    return Normalize(ns);
+    Point2f p = RandPoint2f();
+    Float x = p.x < 0.5f ? u.x : -u.x;
+    Float y = p.y < 0.5f ? u.y : -u.y;
+    res = ns + x * ss + y * ts;
+    return Normalize(res);
 }
 
 

@@ -48,7 +48,7 @@
 namespace pbrt {
 
 enum class SSS_METHOD {
-    DEFAULT, NORMAL_DIFFUSION, TWO_PASS
+    DEFAULT, NORMAL_DIFFUSION, TWO_PASS, CLASSIC
 };
 
 // SubsurfaceMaterial Declarations
@@ -79,7 +79,8 @@ public:
               remapRoughness(remapRoughness),
               scatterDistance(scatterDistance),
               method(method),
-              table(100, 64) {
+              table(100, 64),
+              g(g){
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
 
@@ -99,6 +100,7 @@ protected:
     const Float eta;
     const bool remapRoughness;
     SSS_METHOD method;
+    Float g;
 
 private:
     BSSRDFTable table;
