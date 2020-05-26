@@ -64,7 +64,7 @@ ClassicalBSSRDF::ClassicalBSSRDF(const SurfaceInteraction &po, Float eta, const 
 }
 
 Float ClassicalBSSRDF::Pdf_Sr(int ch, Float r) const {
-    return std::exp(-mSigmaTr[ch] * r);
+    return mSigmaTr[ch] * std::exp(-mSigmaTr[ch] * r);
 }
 
 Float ClassicalBSSRDF::Sample_Sr(int ch, Float u) const {
