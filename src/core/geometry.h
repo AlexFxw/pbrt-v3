@@ -1637,6 +1637,26 @@ inline Point2f RandPoint2f() {
     return Point2f(GetRandomFloat(), GetRandomFloat());
 }
 
+inline Vector3f SampleAzimuthVector(const Vector3f &normal, const Point2f &u) {
+    Vector3f res, ss, ts;
+    Vector3f ns = normal;
+    CoordinateSystem(normal, &ss, &ts);
+    Float r1 = Clamp(u.x * 2.0f * Pi, 0, 2 * Pi);
+    Float r2 = Clamp(u.y, 0, 1);
+    Float r2s = std::sqrt(r2);
+    // res = (ns * std::sqrt(1 - r2)) + (ss * std::cos(r1) * r2s) + (ts * std::sin(r1) * r2s);
+    // res = u.x * ss + u.y * ts;
+    // std::cout << u << res << std::endl;
+    // res = (ss * std::sqrt(1 - r2)) + (ns * std::cos(r1) * r2s) + (ts * std::sin(r1) * r2s);
+    // res = Vector3f(GetRandomFloat(), GetRandomFloat(), GetRandomFloat());
+    // Point2f p = RandPoint2f();
+    // Float x = p.x < 0.5f ? u.x : -u.x;
+    // Float y = p.y < 0.5f ? u.y : -u.y;
+    // res = ns + x * ss + y * ts;
+    return Normalize(ns);
+}
+
+
 }  // namespace pbrt
 
 #endif  // PBRT_CORE_GEOMETRY_H

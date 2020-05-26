@@ -39,6 +39,7 @@
 #include "paramset.h"
 #include "scene.h"
 #include "stats.h"
+#include "materials/subsurface/twopass_dipole.h"
 
 namespace pbrt {
 
@@ -153,24 +154,41 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (isect.bssrdf && (flags & BSDF_TRANSMISSION)) {
             // Importance sample the BSSRDF
             SurfaceInteraction pi;
-            Spectrum S = isect.bssrdf->Sample_S(
-                scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
-            DCHECK(!std::isinf(beta.y()));
-            if (S.IsBlack() || pdf == 0) break;
-            beta *= S / pdf;
+            if(isect.bssrdf->UseCacheCloud() && !isect.bssrdf->Prepared()) {
+                TwoPassBSSRDF *twopass = (TwoPassBSSRDF*)isect.bssrdf;
+                twopass->twoPassHelper->PrepareOctree(scene, arena, isect.bsdf);
+            }
 
-            // Account for the direct subsurface scattering component
-            L += beta * UniformSampleOneLight(pi, scene, arena, sampler, false,
-                                              lightDistribution->Lookup(pi.p));
+            if(!isect.bssrdf->UseCacheCloud()) {
+                Spectrum S = isect.bssrdf->Sample_S(
+                        scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
+                DCHECK(!std::isinf(beta.y()));
+                if (S.IsBlack() || pdf == 0) break;
+                beta *= S / pdf;
+                // Account for the direct subsurface scattering component
+                L += beta * UniformSampleOneLight(pi, scene, arena, sampler, false,
+                                                  lightDistribution->Lookup(pi.p));
+                // Account for the indirect subsurface scattering component
 
-            // Account for the indirect subsurface scattering component
-            Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,
-                                           BSDF_ALL, &flags);
-            if (f.IsBlack() || pdf == 0) break;
-            beta *= f * AbsDot(wi, pi.shading.n) / pdf;
-            DCHECK(!std::isinf(beta.y()));
-            specularBounce = (flags & BSDF_SPECULAR) != 0;
-            ray = pi.SpawnRay(wi);
+                Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,
+                                               BSDF_ALL, &flags);
+                if (f.IsBlack() || pdf == 0) break;
+
+                if (!isect.bssrdf->ContainSingleScattering()) {
+                    // Normal diffusion do not need single scatter term
+                    beta *= f * AbsDot(wi, pi.shading.n) / pdf;
+                }
+
+                DCHECK(!std::isinf(beta.y()));
+                specularBounce = (flags & BSDF_SPECULAR) != 0;
+                ray = pi.SpawnRay(wi);
+            } else {
+                // FIXME: Two pass dipole
+                Spectrum S = isect.bssrdf->Sample_S(
+                        scene, sampler.Get1D(), sampler.Get2D(), arena, &isect, &pdf);
+                beta *= S / pdf;
+                L += beta;
+            }
         }
 
         // Possibly terminate the path with Russian roulette.

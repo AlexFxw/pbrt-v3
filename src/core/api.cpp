@@ -1351,7 +1351,7 @@ void pbrtShape(const std::string &name, const ParamSet &params) {
                        graphicsState.reverseOrientation, params);
         if (shapes.empty()) return;
         std::shared_ptr<Material> mtl = graphicsState.GetMaterialForShape(params);
-        // TODO: Initialize VAE here.
+        // Initialize material here.
         mtl->PrepareMaterial(shapes, params);
         params.ReportUnused();
         MediumInterface mi = graphicsState.CreateMediumInterface();

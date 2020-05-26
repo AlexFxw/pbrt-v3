@@ -14,3 +14,4 @@ src/ext/tensorflow
 *.DS_Store
 scenes/
 data
+render.sh

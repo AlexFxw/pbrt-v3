@@ -9,14 +9,16 @@ namespace pbrt {
 
 class NormalDiffusion : public SeparableBSSRDF {
 public:
-    NormalDiffusion(const Spectrum &d, const SurfaceInteraction &po,
+    NormalDiffusion(const Spectrum &R, const Spectrum &d, const SurfaceInteraction &po,
                     Float eta, const Material *material, TransportMode mode);
     Spectrum Sr(Float r) const override;
     Float Sample_Sr(int ch, Float u) const override;
     Float Pdf_Sr(int ch, Float r) const override;
 
+    bool ContainSingleScattering() const final { return true; }
+
 private:
-    Spectrum d;
+    Spectrum d, R;
     constexpr static Float firstTermRatio = 0.25f, secondTermRatio = 0.75f;
 };
 

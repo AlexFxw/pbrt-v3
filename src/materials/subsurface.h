@@ -43,8 +43,13 @@
 #include "material.h"
 #include "reflection.h"
 #include "bssrdf.h"
+#include "subsurface/twopass_dipole.h"
 
 namespace pbrt {
+
+enum class SSS_METHOD {
+    DEFAULT, NORMAL_DIFFUSION, TWO_PASS
+};
 
 // SubsurfaceMaterial Declarations
 class SubsurfaceMaterial : public Material {
@@ -60,7 +65,8 @@ public:
                        const std::shared_ptr<Texture<Float>> &vRoughness,
                        const std::shared_ptr<Texture<Float>> &bumpMap,
                        bool remapRoughness,
-                       const std::shared_ptr<Texture<Spectrum>> &scatterDistance)
+                       const std::shared_ptr<Texture<Spectrum>> &scatterDistance,
+                       SSS_METHOD method = SSS_METHOD::DEFAULT)
             : scale(scale),
               Kr(Kr),
               Kt(Kt),
@@ -72,6 +78,7 @@ public:
               eta(eta),
               remapRoughness(remapRoughness),
               scatterDistance(scatterDistance),
+              method(method),
               table(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table);
     }
@@ -80,6 +87,7 @@ public:
                                     TransportMode mode,
                                     bool allowMultipleLobes) const;
 
+    void PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes, const ParamSet &params) override;
 protected:
     // SubsurfaceMaterial Private Data
     const Float scale;
@@ -87,8 +95,10 @@ protected:
     std::shared_ptr<Texture<Float>> uRoughness, vRoughness;
     std::shared_ptr<Texture<Float>> bumpMap;
     std::shared_ptr<Texture<Spectrum>> scatterDistance;
+    std::shared_ptr<TwoPassHelper> twopassHelper = nullptr;
     const Float eta;
     const bool remapRoughness;
+    SSS_METHOD method;
 
 private:
     BSSRDFTable table;

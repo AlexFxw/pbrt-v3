@@ -214,6 +214,14 @@ class Distribution2D;
 
 class Utils;
 
+class IrradianceOctree;
+
+class TwoPassHelper;
+
+class TwoPassBSSRDF;
+
+class PathIntegrator;
+
 #ifdef PBRT_FLOAT_AS_DOUBLE
 typedef double Float;
 #else

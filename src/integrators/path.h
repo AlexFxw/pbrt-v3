@@ -42,6 +42,7 @@
 #include "pbrt.h"
 #include "integrator.h"
 #include "lightdistrib.h"
+#include "materials/subsurface/twopass_dipole.h"
 
 namespace pbrt {
 
@@ -64,6 +65,7 @@ class PathIntegrator : public SamplerIntegrator {
     const Float rrThreshold;
     const std::string lightSampleStrategy;
     std::unique_ptr<LightDistribution> lightDistribution;
+    std::shared_ptr<TwoPassHelper> twoPassHelper;
 };
 
 PathIntegrator *CreatePathIntegrator(const ParamSet &params,

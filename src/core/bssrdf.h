@@ -55,14 +55,15 @@ struct ScatterSamplingRecord {
     Normal3f n;
     bool isValid = false;
     Spectrum throughout;
-    int sampledChannel = - 1;
+    int sampledChannel = -1;
 };
 
 // BSSRDF Declarations
 class BSSRDF {
-  public:
+public:
     // BSSRDF Public Methods
     BSSRDF(const SurfaceInteraction &po, Float eta) : po(po), eta(eta) {}
+
     virtual ~BSSRDF() {}
 
     // BSSRDF Interface
@@ -71,7 +72,13 @@ class BSSRDF {
                               MemoryArena &arena, SurfaceInteraction *si,
                               Float *pdf) const = 0;
 
-  protected:
+    virtual bool ContainSingleScattering() const { return false; }
+
+    virtual bool UseCacheCloud() const { return false; }
+
+    virtual bool Prepared() const { return true; }
+
+protected:
     // BSSRDF Protected Data
     const SurfaceInteraction &po;
     Float eta;
@@ -80,28 +87,32 @@ class BSSRDF {
 class SeparableBSSRDF : public BSSRDF {
     friend class SeparableBSSRDFAdapter;
 
-  public:
+public:
     // SeparableBSSRDF Public Methods
     SeparableBSSRDF(const SurfaceInteraction &po, Float eta,
                     const Material *material, TransportMode mode)
-        : BSSRDF(po, eta),
-          ns(po.shading.n),
-          ss(Normalize(po.shading.dpdu)),
-          ts(Cross(ns, ss)),
-          material(material),
-          mode(mode) {}
+            : BSSRDF(po, eta),
+              ns(po.shading.n),
+              ss(Normalize(po.shading.dpdu)),
+              ts(Cross(ns, ss)),
+              material(material),
+              mode(mode) {}
+
     Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) {
         ProfilePhase pp(Prof::BSSRDFEvaluation);
         Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
         return (1 - Ft) * Sp(pi) * Sw(wi);
     }
+
     Spectrum Sw(const Vector3f &w) const {
         Float c = 1 - 2 * FresnelMoment1(1 / eta);
         return (1 - FrDielectric(CosTheta(w), 1, eta)) / (c * Pi);
     }
+
     Spectrum Sp(const SurfaceInteraction &pi) const {
         return Sr(Distance(po.p, pi.p));
     }
+
     Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                       MemoryArena &arena, SurfaceInteraction *si,
                       Float *pdf) const;
@@ -115,7 +126,7 @@ class SeparableBSSRDF : public BSSRDF {
     virtual Float Sample_Sr(int ch, Float u) const = 0;
     virtual Float Pdf_Sr(int ch, Float r) const = 0;
 
-  private:
+private:
     // SeparableBSSRDF Private Data
     const Normal3f ns;
     const Vector3f ss, ts;
@@ -124,21 +135,22 @@ class SeparableBSSRDF : public BSSRDF {
 };
 
 class TabulatedBSSRDF : public SeparableBSSRDF {
-  public:
+public:
     // TabulatedBSSRDF Public Methods
     TabulatedBSSRDF(const SurfaceInteraction &po, const Material *material,
                     TransportMode mode, Float eta, const Spectrum &sigma_a,
                     const Spectrum &sigma_s, const BSSRDFTable &table)
-        : SeparableBSSRDF(po, eta, material, mode), table(table) {
+            : SeparableBSSRDF(po, eta, material, mode), table(table) {
         sigma_t = sigma_a + sigma_s;
         for (int c = 0; c < Spectrum::nSamples; ++c)
             rho[c] = sigma_t[c] != 0 ? (sigma_s[c] / sigma_t[c]) : 0;
     }
+
     Spectrum Sr(Float distance) const;
     Float Pdf_Sr(int ch, Float distance) const;
     Float Sample_Sr(int ch, Float sample) const;
 
-  private:
+private:
     // TabulatedBSSRDF Private Data
     const BSSRDFTable &table;
     Spectrum sigma_t, rho;
@@ -154,16 +166,18 @@ struct BSSRDFTable {
 
     // BSSRDFTable Public Methods
     BSSRDFTable(int nRhoSamples, int nRadiusSamples);
+
     inline Float EvalProfile(int rhoIndex, int radiusIndex) const {
         return profile[rhoIndex * nRadiusSamples + radiusIndex];
     }
 };
 
 class SeparableBSSRDFAdapter : public BxDF {
-  public:
+public:
     // SeparableBSSRDFAdapter Public Methods
     SeparableBSSRDFAdapter(const SeparableBSSRDF *bssrdf)
-        : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), bssrdf(bssrdf) {}
+            : BxDF(BxDFType(BSDF_REFLECTION | BSDF_DIFFUSE)), bssrdf(bssrdf) {}
+
     Spectrum f(const Vector3f &wo, const Vector3f &wi) const {
         Spectrum f = bssrdf->Sw(wi);
         // Update BSSRDF transmission term to account for adjoint light
@@ -172,9 +186,10 @@ class SeparableBSSRDFAdapter : public BxDF {
             f *= bssrdf->eta * bssrdf->eta;
         return f;
     }
+
     std::string ToString() const { return "[ SeparableBSSRDFAdapter ]"; }
 
-  private:
+private:
     const SeparableBSSRDF *bssrdf;
 };
 

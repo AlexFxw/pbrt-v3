@@ -13,9 +13,9 @@ Float SmallRFilter(Float r) {
     return r;
 }
 
-NormalDiffusion::NormalDiffusion(const Spectrum &d, const SurfaceInteraction &po, Float eta,
+NormalDiffusion::NormalDiffusion(const Spectrum &R, const Spectrum &d, const SurfaceInteraction &po, Float eta,
                                  const Material *material, TransportMode mode):
-                                 SeparableBSSRDF(po, eta, material, mode), d(d){
+                                 SeparableBSSRDF(po, eta, material, mode), d(d), R(R){
 
 }
 
@@ -30,10 +30,10 @@ Float NormalDiffusion::Sample_Sr(int ch, Float u) const {
     if (u < firstTermRatio) {
         // Sample the first exponential term
         u = std::min<Float>(u * 4, OneMinusEpsilon);
-        return d[ch] * std::log(1.0f / (1.0f - u));
+        return d[ch] * std::log(1 / (1 - u));
     } else {
         u = std::min<Float>((u - firstTermRatio) / secondTermRatio, OneMinusEpsilon);
-        return 3 * d[ch] * std::log(1.0f / (1.0f - u));
+        return 3 * d[ch] * std::log(1 / (1 - u));
     }
 }
 
@@ -42,7 +42,7 @@ Spectrum NormalDiffusion::Sr(Float r) const {
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     r = SmallRFilter(r);
     Spectrum spectrumR = -Spectrum(r);
-    return (Exp(spectrumR / this->d) + Exp(spectrumR / (3 * d))) / (8 * Pi * d * r);
+    return R * (Exp(spectrumR / this->d) + Exp(spectrumR / (3 * d))) / (8 * Pi * d * r);
 }
 
 

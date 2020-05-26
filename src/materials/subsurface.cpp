@@ -40,13 +40,14 @@
 #include "paramset.h"
 #include "interaction.h"
 #include "subsurface/normal_diffusion.h"
+#include "subsurface/twopass_dipole.h"
 
 namespace pbrt {
 
 // SubsurfaceMaterial Method Definitions
 void SubsurfaceMaterial::ComputeScatteringFunctions(
-    SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-    bool allowMultipleLobes) const {
+        SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+        bool allowMultipleLobes) const {
     // Perform bump mapping with _bumpMap_, if present
     if (bumpMap) Bump(bumpMap, si);
 
@@ -64,50 +65,61 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
     bool isSpecular = urough == 0 && vrough == 0;
     if (isSpecular && allowMultipleLobes) {
         si->bsdf->Add(
-            ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
+                ARENA_ALLOC(arena, FresnelSpecular)(R, T, 1.f, eta, mode));
     } else {
         if (remapRoughness) {
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
             vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
         }
         MicrofacetDistribution *distrib =
-            isSpecular ? nullptr
-                       : ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(
-                             urough, vrough);
+                isSpecular ? nullptr
+                           : ARENA_ALLOC(arena, TrowbridgeReitzDistribution)(
+                        urough, vrough);
         if (!R.IsBlack()) {
             Fresnel *fresnel = ARENA_ALLOC(arena, FresnelDielectric)(1.f, eta);
             if (isSpecular)
                 si->bsdf->Add(
-                    ARENA_ALLOC(arena, SpecularReflection)(R, fresnel));
+                        ARENA_ALLOC(arena, SpecularReflection)(R, fresnel));
             else
                 si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetReflection)(
-                    R, distrib, fresnel));
+                        R, distrib, fresnel));
         }
         if (!T.IsBlack()) {
             if (isSpecular)
                 si->bsdf->Add(ARENA_ALLOC(arena, SpecularTransmission)(
-                    T, 1.f, eta, mode));
+                        T, 1.f, eta, mode));
             else
                 si->bsdf->Add(ARENA_ALLOC(arena, MicrofacetTransmission)(
-                    T, distrib, 1.f, eta, mode));
+                        T, distrib, 1.f, eta, mode));
         }
     }
-#ifdef USE_NORMALIZE_DIFFUSE
-    Spectrum d = scatterDistance->Evaluate(*si);
-    si->bssrdf = ARENA_ALLOC(arena, NormalDiffusion)(d, *si, eta, this, mode);
-#else
-    Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
-    Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
-    si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
-                                                     sig_a, sig_s, table);
-#endif
+
+    if (method == SSS_METHOD::NORMAL_DIFFUSION) {
+        Spectrum d = scatterDistance->Evaluate(*si);
+        si->bssrdf = ARENA_ALLOC(arena, NormalDiffusion)(R, d, *si, eta, this, mode);
+    } else if (method == SSS_METHOD::DEFAULT) {
+        Spectrum sig_a = scale * sigma_a->Evaluate(*si).Clamp();
+        Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
+        si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
+                                                         sig_a, sig_s, table);
+    } else if(method == SSS_METHOD::TWO_PASS) {
+        si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, twopassHelper);
+    }
+}
+
+void SubsurfaceMaterial::PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes, const ParamSet &params) {
+    Material::PrepareMaterial(shapes, params);
+    if(method == SSS_METHOD::TWO_PASS) {
+        twopassHelper = std::make_shared<TwoPassHelper>();
+        twopassHelper->Prepare(shapes);
+    }
 }
 
 SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
     Float sig_a_rgb[3] = {.0011f, .0024f, .014f},
-          sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
+            sig_s_rgb[3] = {2.55f, 3.21f, 3.77f};
     Spectrum sig_a = Spectrum::FromRGB(sig_a_rgb),
-             sig_s = Spectrum::FromRGB(sig_s_rgb);
+            sig_s = Spectrum::FromRGB(sig_s_rgb);
     std::string name = mp.FindString("name");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
     Float g = mp.FindFloat("g", 0.0f);
@@ -126,21 +138,29 @@ SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
     sigma_a = mp.GetSpectrumTexture("sigma_a", sig_a);
     sigma_s = mp.GetSpectrumTexture("sigma_s", sig_s);
     std::shared_ptr<Texture<Spectrum>> Kr =
-        mp.GetSpectrumTexture("Kr", Spectrum(1.f));
+            mp.GetSpectrumTexture("Kr", Spectrum(1.f));
     std::shared_ptr<Texture<Spectrum>> Kt =
-        mp.GetSpectrumTexture("Kt", Spectrum(1.f));
+            mp.GetSpectrumTexture("Kt", Spectrum(1.f));
     std::shared_ptr<Texture<Float>> roughu =
-        mp.GetFloatTexture("uroughness", 0.f);
+            mp.GetFloatTexture("uroughness", 0.f);
     std::shared_ptr<Texture<Float>> roughv =
-        mp.GetFloatTexture("vroughness", 0.f);
+            mp.GetFloatTexture("vroughness", 0.f);
     std::shared_ptr<Texture<Float>> bumpMap =
-        mp.GetFloatTextureOrNull("bumpmap");
+            mp.GetFloatTextureOrNull("bumpmap");
 
     std::shared_ptr<Texture<Spectrum>> scatterDistance =
             mp.GetSpectrumTexture("scatterdistance", Spectrum(0.));
     bool remapRoughness = mp.FindBool("remaproughness", true);
+
+    const std::string method = mp.FindString("method", "default");
+    SSS_METHOD sss_method = SSS_METHOD::DEFAULT;
+    if (method == "normal_diffuse") {
+        sss_method = SSS_METHOD::NORMAL_DIFFUSION;
+    } else if (method == "two_pass") {
+        sss_method = SSS_METHOD::TWO_PASS;
+    }
     return new SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
-                                  roughu, roughv, bumpMap, remapRoughness, scatterDistance);
+                                  roughu, roughv, bumpMap, remapRoughness, scatterDistance, sss_method);
 }
 
 }  // namespace pbrt

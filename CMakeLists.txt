@@ -31,7 +31,8 @@ ENABLE_TESTING()
 # ADD_DEFINITIONS(-D VISUALIZE_SCATTER)
 
 # ADD_DEFINITIONS(-D NAIVE_DIPOLE)
-ADD_DEFINITIONS(-D USE_NORMALIZE_DIFFUSE)
+ADD_DEFINITIONS(-D VISUALIZE_OCTREE)
+# ADD_DEFINITIONS(-D USE_NORMALIZE_DIFFUSE)
 
 
 ###########################################################################
@@ -574,10 +575,6 @@ ADD_SANITIZERS ( obj2pbrt )
 
 ADD_EXECUTABLE ( cyhair2pbrt src/tools/cyhair2pbrt.cpp )
 ADD_SANITIZERS ( cyhair2pbrt )
-
-ADD_EXECUTABLE(octree src/tools/testoctree.cpp)
-TARGET_COMPILE_FEATURES ( octree PRIVATE ${PBRT_CXX11_FEATURES} )
-TARGET_LINK_LIBRARIES ( octree ${ALL_PBRT_LIBS} )
 
 # Unit test
 
