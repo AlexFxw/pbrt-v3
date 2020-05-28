@@ -39,6 +39,7 @@
 #include "interpolation.h"
 #include "paramset.h"
 #include "interaction.h"
+#include "integrators/path.h"
 #include "subsurface/normal_diffusion.h"
 #include "subsurface/twopass_dipole.h"
 #include "subsurface/classical_dipole.h"
@@ -118,6 +119,7 @@ void SubsurfaceMaterial::PrepareMaterial(const std::vector<std::shared_ptr<Shape
     if (method == SSS_METHOD::TWO_PASS) {
         twopassHelper = std::make_shared<TwoPassHelper>();
         twopassHelper->Prepare(shapes);
+        PathIntegrator::AddHelper(twopassHelper);
     }
 }
 

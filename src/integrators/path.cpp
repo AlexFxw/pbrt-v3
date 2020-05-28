@@ -46,6 +46,8 @@ namespace pbrt {
 STAT_PERCENT("Integrator/Zero-radiance paths", zeroRadiancePaths, totalPaths);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
+std::shared_ptr<TwoPassHelper> PathIntegrator::helper;
+
 // PathIntegrator Method Definitions
 PathIntegrator::PathIntegrator(int maxDepth,
                                std::shared_ptr<const Camera> camera,
@@ -60,6 +62,13 @@ PathIntegrator::PathIntegrator(int maxDepth,
 void PathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
     lightDistribution =
             CreateLightSampleDistribution(lightSampleStrategy, scene);
+
+    // TODO: Preprocess the cloud point here?
+    if (helper != nullptr) {
+        MemoryArena arena;
+        helper->PrepareOctree(scene, arena, this);
+        arena.Reset();
+    }
 }
 
 Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
@@ -154,12 +163,12 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (isect.bssrdf && (flags & BSDF_TRANSMISSION)) {
             // Importance sample the BSSRDF
             SurfaceInteraction pi;
-            if(isect.bssrdf->UseCacheCloud() && !isect.bssrdf->Prepared()) {
-                TwoPassBSSRDF *twopass = (TwoPassBSSRDF*)isect.bssrdf;
-                twopass->twoPassHelper->PrepareOctree(scene, arena, isect.bsdf);
-            }
+            // if(isect.bssrdf->UseCacheCloud() && !isect.bssrdf->Prepared()) {
+            //     TwoPassBSSRDF *twopass = (TwoPassBSSRDF*)isect.bssrdf;
+            //     twopass->twoPassHelper->PrepareOctree(scene, arena, isect.bsdf);
+            // }
 
-            if(!isect.bssrdf->UseCacheCloud()) {
+            if (!isect.bssrdf->UseCacheCloud()) {
                 Spectrum S = isect.bssrdf->Sample_S(
                         scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
                 DCHECK(!std::isinf(beta.y()));
@@ -184,11 +193,17 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 /**
                  * While using cache irradiance to compute the radiance,
                  * there is no need to continue tracing the influx.
+                 * If the irradiance cache is not prepared, do not account the sss.
                  */
-                Spectrum S = isect.bssrdf->Sample_S(
-                        scene, sampler.Get1D(), sampler.Get2D(), arena, &isect, &pdf);
-                beta *= S / pdf;
-                L += beta;
+                if (isect.bssrdf->Prepared()) {
+                    isect.bssrdf->SetHelper(helper);
+                    Spectrum S = isect.bssrdf->Sample_S(
+                            scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
+                    if (S.IsBlack() || pdf == 0) break;
+                    beta *= S / pdf;
+                    L += beta; // No need to uniformsample one light because the irradiance stored it already.
+                    specularBounce = (flags & BSDF_SPECULAR) != 0;
+                }
             }
         }
 
@@ -204,6 +219,35 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     }
     ReportValue(pathLength, bounces);
     return L;
+}
+
+void PathIntegrator::AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper) {
+    // FIXME: Only support one helper in a scene yet.
+    helper = std::shared_ptr<TwoPassHelper>(twoPassHelper);
+}
+
+Spectrum PathIntegrator::Irradiance(const Scene &scene, const Point3f &p, const Vector3f &refN,
+                                    Sampler &sampler, MemoryArena &arena, int n) const {
+    // 1. Loop over all directions.
+    int n2 = n * n;
+    Spectrum E(0.0f);
+    Vector3f ss, ts;
+    CoordinateSystem(refN, &ss, &ts);
+    Float nInv = 1 / (Float) n;
+    for (int j = 1; j <= n; j++) {
+        Float Xj = sampler.Get1D();
+        Float theta = std::asin(std::sqrt((j - Xj) * nInv));
+        for (int k = 1; k <= 2 * n; k++) {
+            Float Yk = sampler.Get1D();
+            Float phi = Pi * (k - Yk) * nInv;
+            Vector3f d = refN * std::cos(theta) + ss * std::sin(theta) * std::cos(phi) +
+                         ts * std::sin(theta) * std::sin(phi);
+            RayDifferential ray(p, d);
+            E += Li(ray, scene, sampler, arena, 0);
+        }
+    }
+    E *= Pi / (Float) (2 * n2);
+    return E;
 }
 
 PathIntegrator *CreatePathIntegrator(const ParamSet &params,
@@ -228,6 +272,7 @@ PathIntegrator *CreatePathIntegrator(const ParamSet &params,
     Float rrThreshold = params.FindOneFloat("rrthreshold", 1.);
     std::string lightStrategy =
             params.FindOneString("lightsamplestrategy", "spatial");
+
     return new PathIntegrator(maxDepth, camera, sampler, pixelBounds,
                               rrThreshold, lightStrategy);
 }

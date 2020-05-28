@@ -42,7 +42,6 @@
 #include "pbrt.h"
 #include "integrator.h"
 #include "lightdistrib.h"
-#include "materials/subsurface/twopass_dipole.h"
 
 namespace pbrt {
 
@@ -59,13 +58,17 @@ class PathIntegrator : public SamplerIntegrator {
     Spectrum Li(const RayDifferential &ray, const Scene &scene,
                 Sampler &sampler, MemoryArena &arena, int depth) const;
 
+    static void AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper);
+
+    Spectrum Irradiance(const Scene &scene, const Point3f &p, const Vector3f &refN,
+                        Sampler &sampler, MemoryArena &arena, int n) const;
   private:
     // PathIntegrator Private Data
     const int maxDepth;
     const Float rrThreshold;
     const std::string lightSampleStrategy;
     std::unique_ptr<LightDistribution> lightDistribution;
-    std::shared_ptr<TwoPassHelper> twoPassHelper;
+    static std::shared_ptr<TwoPassHelper> helper;
 };
 
 PathIntegrator *CreatePathIntegrator(const ParamSet &params,

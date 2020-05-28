@@ -56,7 +56,7 @@ struct OctreeNode {
             for (int i = 0; i < 8; i++) {
                 Bounds3f subBound = GetSubspace(bound, i);
                 Float dist = pbrt::DistanceSquared(p, subBound);
-                if (dist == 0.0f) {
+                if (dist == Float(0)) {
                     // In the subspace.
                     subspacePoints[i].push_back(std::move(data));
                     break;
@@ -133,88 +133,23 @@ public:
         root = std::make_shared<OctreeNode>();
         root->Build(0, samplePoints, aabb);
         Propagate(root);
+        std::cout << root->avgData.area;
     }
 
-    Spectrum Search(const Point3f &p) {
-        return Search(p, root, aabb);
+    Spectrum Search(const Point3f &p, const TwoPassBSSRDF *bssrdf) {
+        return Search(p, root, aabb, bssrdf);
     }
 
 private:
-    Spectrum Search(const Point3f &p, const std::shared_ptr<OctreeNode> &node, const Bounds3f &aabb) {
-        // FIXME: Bugs must be here!
-        bool contained = Distance(p, aabb) == 0.0f;
-        Float approxSolidAngle = node->avgData.area / (p - node->avgData.pos).LengthSquared();
-        if (!contained && approxSolidAngle < solidAngleThreshold) {
-            return node->avgData.E * node->avgData.area;
-        } else {
-            Spectrum E(0.0f);
-            if (node->IsLeaf()) {
-                for(auto &rNode: node->relatedNodes) {
-                    E += rNode.E * rNode.area;
-                }
-            } else {
-                for (int i = 0; i < 8; i++) {
-                    if (node->children[i] == nullptr) {
-                        continue;
-                    }
-                    E += Search(p, node->children[i], OctreeNode::GetSubspace(aabb, i));
-                }
-            }
-            return E;
-        }
-    }
+    Spectrum Search(const Point3f &p, const std::shared_ptr<OctreeNode> &node,
+                    const Bounds3f &aabb, const TwoPassBSSRDF *bssrdf);
 
-    void Propagate(const std::shared_ptr<OctreeNode> &node) {
-        IrradianceData &clusterData = node->avgData;
-        clusterData = IrradianceData();
-        Float weightSum = 0.0f;
-        if (node->IsLeaf()) {
-            // Leaf node
-            for (IrradianceData &sample: node->relatedNodes) {
-                clusterData.E += sample.E * sample.area;
-                clusterData.area += sample.area;
-                // FIXME: Use luminance?
-                Float weight = sample.E.y() * sample.area;
-                clusterData.pos += sample.pos * weight;
-                weightSum += weight;
-            }
-        } else {
-            // Inner node.
-            for (int i = 0; i < 8; i++) {
-                if (node->children[i] != nullptr) {
-                    Propagate(node->children[i]);
-                    IrradianceData &childAvg = node->children[i]->avgData;
-                    clusterData.E += childAvg.E * childAvg.area;
-                    clusterData.area += childAvg.area;
-                    Float weight = childAvg.E.y() * childAvg.area;
-                    clusterData.pos += childAvg.pos * weight;
-                    weightSum += weight;
-                }
-            }
-        }
-
-        if (clusterData.area != 0) {
-            clusterData.E /= clusterData.area;
-        }
-
-        if (weightSum != 0) {
-            clusterData.pos /= weightSum;
-        }
-    }
-
-    bool Criterion(const Point3f &p, const std::shared_ptr<OctreeNode> &node) {
-        Float distSq = (p - node->avgData.pos).LengthSquared();
-        if (distSq == 0.0f) {
-            return false;
-        }
-        Float approxSolidAngle = node->avgData.area / distSq;
-        return approxSolidAngle < solidAngleThreshold;
-    }
+    void Propagate(const std::shared_ptr<OctreeNode> &node);
 
     std::shared_ptr<OctreeNode> root;
     int nSamples;
     Bounds3f aabb;
-    static constexpr Float solidAngleThreshold = 0.01f;
+    static constexpr Float solidAngleThreshold = 0.02f;
 };
 
 

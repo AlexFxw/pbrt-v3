@@ -78,6 +78,8 @@ public:
 
     virtual bool Prepared() const { return true; }
 
+    virtual void SetHelper(const std::shared_ptr<TwoPassHelper> &helper) {}
+
 protected:
     // BSSRDF Protected Data
     const SurfaceInteraction &po;

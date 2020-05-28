@@ -18,53 +18,42 @@ class TwoPassHelper {
 public:
     TwoPassHelper() : octreeBuilt(false) {}
 
-    int PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *bsdf);
+    int PrepareOctree(const Scene &scene, MemoryArena &arena, const PathIntegrator *integrator);
     int Prepare(const std::vector<std::shared_ptr<Shape>> &shapes);
 
-    Spectrum E(const Point3f &p);
+    Spectrum E(const Point3f &p, const TwoPassBSSRDF * bssrdf);
 
     bool Prepared() const { return octreeBuilt; }
 
 
 private:
-    Spectrum IrradianceCache(const Scene &scene, const Point3f &p,
-                             Sampler &sampler, MemoryArena &arena) const; // Photon mapping.
     std::unique_ptr<IrradianceOctree> octree = nullptr;
     std::vector<Interaction> sampledP;
     std::vector<int> indices;
     int triangleSum, areaSum;
-    const int nSamples = 10000;
-    const static int irrSamples = 64;
+    const int nSamples = 1000;
+    const static int irrSamples = 16;
     bool octreeBuilt;
     std::mutex buildLock;
 };
 
 class TwoPassBSSRDF : public ClassicalBSSRDF {
 public:
-    // TwoPassBSSRDF(const SurfaceInteraction &po, Float eta,
-    //               std::shared_ptr<TwoPassHelper> twoPassHelper) :
-    //         BSSRDF(po, eta), twoPassHelper(twoPassHelper) {
-
-    // }
     TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
                   TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS,
-                  Float g,std::shared_ptr<TwoPassHelper> twoPassHelper);
+                  Float g, std::shared_ptr<TwoPassHelper> twoPassHelper);
 
     Spectrum Sp(const SurfaceInteraction &pi) const override;
 
-    // Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) override;
-    // Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
-    //                   MemoryArena &arena, SurfaceInteraction *si,
-    //                   Float *pdf) const override;
-
-    // Spectrum Sr(Float d) const override;
     bool UseCacheCloud() const override { return true; }
 
     bool Prepared() const override { return twoPassHelper->Prepared(); }
 
-    std::shared_ptr<TwoPassHelper> twoPassHelper;
+    void SetHelper(const std::shared_ptr<TwoPassHelper> &helper) override {
+        twoPassHelper = std::shared_ptr<TwoPassHelper>(helper);
+    }
 
-private:
+    std::shared_ptr<TwoPassHelper> twoPassHelper;
 
     Spectrum Mo(const Point3f &pi, const Spectrum &influxI) const {
         // Though call influx, it should be already multiplied by the area here.
