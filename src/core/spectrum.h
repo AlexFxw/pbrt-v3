@@ -455,6 +455,7 @@ public:
         XYZToRGB(xyz, rgb);
     }
 
+
     RGBSpectrum ToRGBSpectrum() const;
     static SampledSpectrum FromRGB(
             const Float rgb[3], SpectrumType type = SpectrumType::Illuminant);

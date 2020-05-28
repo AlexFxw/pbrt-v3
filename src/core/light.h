@@ -54,13 +54,13 @@ enum class LightFlags : int {
 };
 
 inline bool IsDeltaLight(int flags) {
-    return flags & (int)LightFlags::DeltaPosition ||
-           flags & (int)LightFlags::DeltaDirection;
+    return flags & (int) LightFlags::DeltaPosition ||
+           flags & (int) LightFlags::DeltaDirection;
 }
 
 // Light Declarations
 class Light {
-  public:
+public:
     // Light Interface
     virtual ~Light();
     Light(int flags, const Transform &LightToWorld,
@@ -69,7 +69,9 @@ class Light {
                                Vector3f *wi, Float *pdf,
                                VisibilityTester *vis) const = 0;
     virtual Spectrum Power() const = 0;
+
     virtual void Preprocess(const Scene &scene) {}
+
     virtual Spectrum Le(const RayDifferential &r) const;
     virtual Float Pdf_Li(const Interaction &ref, const Vector3f &wi) const = 0;
     virtual Spectrum Sample_Le(const Point2f &u1, const Point2f &u2, Float time,
@@ -78,33 +80,44 @@ class Light {
     virtual void Pdf_Le(const Ray &ray, const Normal3f &nLight, Float *pdfPos,
                         Float *pdfDir) const = 0;
 
+    virtual Spectrum SampleDirect(const Scene &scene, const SurfaceInteraction &ref,
+                                  Float *pdf, Sampler &sampler) const {
+        LOG(WARNING) << "No implementation of SampleDirect.";
+        return Spectrum(0.0f);
+    }
+
+
     // Light Public Data
     const int flags;
     const int nSamples;
     const MediumInterface mediumInterface;
 
-  protected:
+protected:
     // Light Protected Data
     const Transform LightToWorld, WorldToLight;
 };
 
 class VisibilityTester {
-  public:
+public:
     VisibilityTester() {}
+
     // VisibilityTester Public Methods
     VisibilityTester(const Interaction &p0, const Interaction &p1)
-        : p0(p0), p1(p1) {}
+            : p0(p0), p1(p1) {}
+
     const Interaction &P0() const { return p0; }
+
     const Interaction &P1() const { return p1; }
+
     bool Unoccluded(const Scene &scene) const;
     Spectrum Tr(const Scene &scene, Sampler &sampler) const;
 
-  private:
+private:
     Interaction p0, p1;
 };
 
 class AreaLight : public Light {
-  public:
+public:
     // AreaLight Interface
     AreaLight(const Transform &LightToWorld, const MediumInterface &medium,
               int nSamples);

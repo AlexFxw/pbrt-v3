@@ -11,10 +11,11 @@ public:
     ClassicalBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
                     TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS, Float g);
 
-    Spectrum Sr(Float d) const override;
+    virtual Spectrum Sr(Float d) const override;
     Float Sample_Sr(int ch, Float u) const override;
     Float Pdf_Sr(int ch, Float r) const override;
-private:
+
+protected:
     Spectrum mZv, mZr;
     Spectrum mSigmaTr;
     Spectrum mSigmaS, mSigmaA;

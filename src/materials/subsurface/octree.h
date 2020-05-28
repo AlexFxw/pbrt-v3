@@ -36,14 +36,10 @@ struct OctreeNode {
 
     Type type;
     IrradianceData avgData;
-    Bounds3f mBound;
-    int mDepth;
     std::shared_ptr<OctreeNode> children[8];
     std::vector<IrradianceData> relatedNodes;
 
     void Build(int depth, std::vector<IrradianceData> &points, const Bounds3f &bound) {
-        mDepth = depth;
-        mBound = bound;
         if (points.size() <= threshold) {
             type = Type::Leaf;
             relatedNodes = std::move(points);
@@ -79,7 +75,7 @@ struct OctreeNode {
         }
     }
 
-    Bounds3f GetSubspace(const Bounds3f &bound, int index) {
+    static Bounds3f GetSubspace(const Bounds3f &bound, int index) {
         Point3f middle = bound.pMin + (bound.Diagonal() / 2.0f);
         Point3f pMin = bound.pMin, pMax = bound.pMax;
         if (index == 0) {
@@ -129,33 +125,40 @@ public:
     IrradianceOctree() : nSamples(0) {}
 
     void Build(std::vector<IrradianceData> &samplePoints) {
-        Bounds3f bound((Point3f()), Point3f());
+        aabb = Bounds3f((Point3f()), Point3f());
         for (const IrradianceData &data: samplePoints) {
             const Point3f &p = data.GetPos();
-            bound = Union(bound, p);
+            aabb = Union(aabb, p);
         }
         root = std::make_shared<OctreeNode>();
-        root->Build(0, samplePoints, bound);
+        root->Build(0, samplePoints, aabb);
         Propagate(root);
     }
 
     Spectrum Search(const Point3f &p) {
-        return Search(p, root);
+        return Search(p, root, aabb);
     }
 
 private:
-    Spectrum Search(const Point3f &p, const std::shared_ptr<OctreeNode> &node) {
-        const Bounds3f &aabb = node->mBound;
-        bool contained = Distance(p, aabb) == 0;
-        if ((!contained && Criterion(p, node)) || node->IsLeaf()) {
-            return node->avgData.E;
+    Spectrum Search(const Point3f &p, const std::shared_ptr<OctreeNode> &node, const Bounds3f &aabb) {
+        // FIXME: Bugs must be here!
+        bool contained = Distance(p, aabb) == 0.0f;
+        Float approxSolidAngle = node->avgData.area / (p - node->avgData.pos).LengthSquared();
+        if (!contained && approxSolidAngle < solidAngleThreshold) {
+            return node->avgData.E * node->avgData.area;
         } else {
             Spectrum E(0.0f);
-            for (int i = 0; i < 8; i++) {
-                if (node->children[i] == nullptr) {
-                    continue;
+            if (node->IsLeaf()) {
+                for(auto &rNode: node->relatedNodes) {
+                    E += rNode.E * rNode.area;
                 }
-                E += Search(p, node->children[i]);
+            } else {
+                for (int i = 0; i < 8; i++) {
+                    if (node->children[i] == nullptr) {
+                        continue;
+                    }
+                    E += Search(p, node->children[i], OctreeNode::GetSubspace(aabb, i));
+                }
             }
             return E;
         }
@@ -171,7 +174,7 @@ private:
                 clusterData.E += sample.E * sample.area;
                 clusterData.area += sample.area;
                 // FIXME: Use luminance?
-                Float weight = sample.area;
+                Float weight = sample.E.y() * sample.area;
                 clusterData.pos += sample.pos * weight;
                 weightSum += weight;
             }
@@ -183,7 +186,7 @@ private:
                     IrradianceData &childAvg = node->children[i]->avgData;
                     clusterData.E += childAvg.E * childAvg.area;
                     clusterData.area += childAvg.area;
-                    Float weight = childAvg.area;
+                    Float weight = childAvg.E.y() * childAvg.area;
                     clusterData.pos += childAvg.pos * weight;
                     weightSum += weight;
                 }
@@ -210,7 +213,8 @@ private:
 
     std::shared_ptr<OctreeNode> root;
     int nSamples;
-    static constexpr Float solidAngleThreshold = 1.0f;
+    Bounds3f aabb;
+    static constexpr Float solidAngleThreshold = 0.01f;
 };
 
 

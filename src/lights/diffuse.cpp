@@ -36,6 +36,8 @@
 #include "sampling.h"
 #include "shapes/triangle.h"
 #include "stats.h"
+#include "sampler.h"
+#include "scene.h"
 
 namespace pbrt {
 
@@ -45,20 +47,20 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &LightToWorld,
                                    const Spectrum &Lemit, int nSamples,
                                    const std::shared_ptr<Shape> &shape,
                                    bool twoSided)
-    : AreaLight(LightToWorld, mediumInterface, nSamples),
-      Lemit(Lemit),
-      shape(shape),
-      twoSided(twoSided),
-      area(shape->Area()) {
+        : AreaLight(LightToWorld, mediumInterface, nSamples),
+          Lemit(Lemit),
+          shape(shape),
+          twoSided(twoSided),
+          area(shape->Area()) {
     // Warn if light has transformation with non-uniform scale, though not
     // for Triangles, since this doesn't matter for them.
     if (WorldToLight.HasScale() &&
         dynamic_cast<const Triangle *>(shape.get()) == nullptr)
         Warning(
-            "Scaling detected in world to light transformation! "
-            "The system has numerous assumptions, implicit and explicit, "
-            "that this transform will have no scale factors in it. "
-            "Proceed at your own risk; your image may have errors.");
+                "Scaling detected in world to light transformation! "
+                "The system has numerous assumptions, implicit and explicit, "
+                "that this transform will have no scale factors in it. "
+                "Proceed at your own risk; your image may have errors.");
 }
 
 Spectrum DiffuseAreaLight::Power() const {
@@ -132,9 +134,30 @@ void DiffuseAreaLight::Pdf_Le(const Ray &ray, const Normal3f &n, Float *pdfPos,
                        : CosineHemispherePdf(Dot(n, ray.d));
 }
 
+Spectrum DiffuseAreaLight::SampleDirect(const Scene &scene, const SurfaceInteraction &ref,
+                                        Float *pdf, Sampler &sampler) const {
+    // FIXME: There may be a bug here.
+    Float lightPdf;
+    Interaction isect = shape->Sample(sampler.Get2D(), &lightPdf);
+    Ray ray(isect.p, (ref.p - isect.p));
+    SurfaceInteraction collide;
+    if(!scene.Intersect(ray, &collide)) {
+        return Spectrum(0.0f);
+    }
+
+    if(collide.p != ref.p) {
+        *pdf = 0;
+        return Spectrum(0.0f);
+    }
+    Float rayDist = ray.d.Length();
+    Float dp = AbsDot(ray.d, collide.shading.n); // FIXME: Or ref.shading?
+    *pdf = dp != 0 ? (rayDist / dp) : 0.0f;
+    return Lemit;
+}
+
 std::shared_ptr<AreaLight> CreateDiffuseAreaLight(
-    const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape) {
+        const Transform &light2world, const Medium *medium,
+        const ParamSet &paramSet, const std::shared_ptr<Shape> &shape) {
     Spectrum L = paramSet.FindOneSpectrum("L", Spectrum(1.0));
     Spectrum sc = paramSet.FindOneSpectrum("scale", Spectrum(1.0));
     int nSamples = paramSet.FindOneInt("samples",

@@ -48,7 +48,7 @@
 namespace pbrt {
 
 enum class SSS_METHOD {
-    DEFAULT, NORMAL_DIFFUSION, TWO_PASS, CLASSIC
+    DEFAULT, NORMAL_DIFFUSION, TWO_PASS, CLASSIC, DIRECTIONAL
 };
 
 // SubsurfaceMaterial Declarations

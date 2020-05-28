@@ -17,7 +17,6 @@
 namespace pbrt {
 
 int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *bsdf) {
-    std::cout << "Waiting mutex" << std::endl;
     std::lock_guard<std::mutex> lockGuard(buildLock);
     if (octreeBuilt) {
         return 0;
@@ -32,9 +31,12 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *b
 #endif
 
     // std::cout << "calculating: " << i << std::endl;
+    Float irrSamplesInv = 1.0f / (Float)irrSamples;
+    Float sa = areaSum / (Float)nSamples;
     for (int i = 0; i < nSamples; i++) {
         Float pdf;
         Interaction &sP = sampledP[i];
+        int trigIndx = indices[i];
         // TODO: Sample a direction of tmp
         Spectrum E = Spectrum(0.0f);
         // Initialize BSDF?
@@ -60,12 +62,7 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *b
 
         for (int irr = 0; irr < irrSamples; irr++) {
             // TODO: Irradiance caching.
-            tmp.wo = SampleAzimuthVector(Vector3f(tmp.n), randomSampler.Get2D());
-            // tmp.wo = UniformSampleHemisphere(randomSampler.Get2D());
-            // Point2f u2 = RandPoint2f();
-            // Vector3f tmpWo(u2.x, u2.y, GetRandomFloat());
-            // Vector3f wo = tmpWo.x * ss + tmpWo.y * ts + tmpWo.z * tmp.wo;
-            // tmp.wo = wo;
+            // tmp.wo = SampleAzimuthVector(Vector3f(tmp.n), randomSampler.Get2D());
 
 #ifdef VISUALIZE_OCTREE
             if (!visualizedWo) {
@@ -74,40 +71,23 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *b
                 visualizedWo = true;
             }
 #endif
-            // Spectrum directRadiance = UniformSampleOneLight(tmp, scene, arena, randomSampler);
-
-            // Spectrum directRadiance = integrator->Li(RayDifferential(tmp.p, tmp.wo), scene,
-            //                                          randomSampler, arena, 0);
             const auto &lights = scene.lights;
             const int index = Clamp((int) (randomSampler.Get1D() * lights.size()), 0, lights.size());
             const auto &light = *lights[index];
-            Ray r, probeRay;
-            Normal3f nLight;
-            Float pdfPos, pdfDir, pdf;
-            Spectrum e = light.Sample_Le(randomSampler.Get2D(), randomSampler.Get2D(),
-                                         tmp.time, &r, &nLight, &pdfPos, &pdfDir);
-
-            Vector3f wo = tmp.p - probeRay.o, wi;
-            tmp.bsdf->Sample_f(wo, &wi,randomSampler.Get2D(), &pdf);
-            tmp.wo = wo;
-
-            Spectrum directRadiance = EstimateDirect(tmp, randomSampler.Get2D(), light, randomSampler.Get2D(),
-                                                     scene, randomSampler, arena, false, true) * pdf;
-            // Spectrum directRadiance = IrradianceCache(scene, tmp.p, randomSampler, arena);
+            Float pdf;
+            Spectrum directRadiance = light.SampleDirect(scene, tmp, &pdf, randomSampler);
 
             {
                 // Handle indirect; TODO: Add parameter to control
             }
 
-            if (!directRadiance.IsBlack()) {
-                std::cout << directRadiance << std::endl;
+            if (!directRadiance.IsBlack() && pdf != 0) {
+                directRadiance /= pdf;
+                std::cout << trigIndx << directRadiance << std::endl;
+                E += directRadiance;
             }
-
-            E += directRadiance;
         }
-        E /= (Float) irrSamples;
-        Float sa = 1.0f / (Float) nSamples; // FIXME: Sa?
-        E /= sa;
+        E *= irrSamplesInv;
         data.emplace_back(tmp.p, E, sa);
     }
 #ifdef VISUALIZE_OCTREE
@@ -116,25 +96,28 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, BSDF *b
     octree = std::unique_ptr<IrradianceOctree>(new IrradianceOctree());
     octree->Build(data);
     octreeBuilt = true;
+    std::cout << "Prepared octree." << std::endl;
     return 0;
 }
 
 int TwoPassHelper::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes) {
     std::shared_ptr<TriangleMesh> triMesh(Utils::PreprocessTriangles(shapes));
     DCHECK_EQ(triMesh->nTriangles, shapes.size());
-
+    areaSum = triMesh->area;
     triangleSum = triMesh->nTriangles;
 
     for (int i = 0; i < nSamples; i++) {
         Float pdf;
         int trigIdx = triMesh->areaDistri->SampleDiscrete(GetRandomFloat());
         sampledP.push_back(shapes[trigIdx]->Sample(RandPoint2f(), &pdf));
+        indices.push_back(trigIdx);
     }
     return 0;
 }
 
 Spectrum TwoPassHelper::E(const Point3f &p) {
     Spectrum E = octree->Search(p);
+    // std::cout << "E: " << E << std::endl;
     return E;
 }
 
@@ -170,26 +153,37 @@ Spectrum TwoPassHelper::IrradianceCache(const Scene &scene, const Point3f &p,
 }
 
 
-Spectrum
-TwoPassBSSRDF::Sample_S(const Scene &scene, Float u1, const Point2f &u2, MemoryArena &arena, SurfaceInteraction *si,
-                        Float *pdf) const {
-    // TODO: Not sure if it is right here.
-    // In two pass cache method, there is actually no need to sample a output position,
-    // So the si is the SurfaceInteraction object attached this TwoPassBSSRDF itself.
-    ProfilePhase pp(Prof::BSSRDFSampling);
-    *pdf = 1.0f;
-    Spectrum E = twoPassHelper->E(po.p);
-    E = E * InvPi;
-    if (!E.IsBlack()) {
-        si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
-        si->bsdf->Add(ARENA_ALLOC(arena, TwoPassBSSRDFAdapter)(this));
-        si->wo = Vector3f(si->shading.n);
-    }
-    return E;
+// Spectrum
+// TwoPassBSSRDF::Sample_S(const Scene &scene, Float u1, const Point2f &u2, MemoryArena &arena, SurfaceInteraction *si,
+//                         Float *pdf) const {
+//     // TODO: Not sure if it is right here.
+//     // In two pass cache method, there is actually no need to sample a output position,
+//     // So the si is the SurfaceInteraction object attached this TwoPassBSSRDF itself.
+//     // ProfilePhase pp(Prof::BSSRDFSampling);
+//     // *pdf = 1.0f;
+//     // if (!E.IsBlack()) {
+//     //     si->bsdf = ARENA_ALLOC(arena, BSDF)(*si);
+//     //     si->bsdf->Add(ARENA_ALLOC(arena, TwoPassBSSRDFAdapter)(this));
+//     //     si->wo = Vector3f(si->shading.n);
+//     // }
+//     return E;
+// }
+
+Spectrum TwoPassBSSRDF::Sp(const SurfaceInteraction &pi) const {
+    Spectrum E = twoPassHelper->E(pi.p);
+    Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
+    return (1 - Ft) * Mo(pi.p, E);
+    // E = Mo(pi.p, E) * InvPi;
+    // return E;
+
 }
 
-Spectrum TwoPassBSSRDF::S(const SurfaceInteraction &pi, const Vector3f &wi) {
-    // TODO
-    return Spectrum(0.0f);
+TwoPassBSSRDF::TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
+                             TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS, Float g,
+                             std::shared_ptr<TwoPassHelper> twoPassHelper) :
+                             ClassicalBSSRDF(po, eta, material, mode, sigmaA, sigmaS, g),
+                             twoPassHelper(twoPassHelper){
+
 }
+
 } // namespace pbrt

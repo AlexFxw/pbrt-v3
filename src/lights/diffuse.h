@@ -47,15 +47,17 @@ namespace pbrt {
 
 // DiffuseAreaLight Declarations
 class DiffuseAreaLight : public AreaLight {
-  public:
+public:
     // DiffuseAreaLight Public Methods
     DiffuseAreaLight(const Transform &LightToWorld,
                      const MediumInterface &mediumInterface, const Spectrum &Le,
                      int nSamples, const std::shared_ptr<Shape> &shape,
                      bool twoSided = false);
+
     Spectrum L(const Interaction &intr, const Vector3f &w) const {
         return (twoSided || Dot(intr.n, w) > 0) ? Lemit : Spectrum(0.f);
     }
+
     Spectrum Power() const;
     Spectrum Sample_Li(const Interaction &ref, const Point2f &u, Vector3f *wo,
                        Float *pdf, VisibilityTester *vis) const;
@@ -66,7 +68,10 @@ class DiffuseAreaLight : public AreaLight {
     void Pdf_Le(const Ray &, const Normal3f &, Float *pdfPos,
                 Float *pdfDir) const;
 
-  protected:
+    Spectrum SampleDirect(const Scene &scene, const SurfaceInteraction &ref,
+                          Float *pdf, Sampler &sampler) const override;
+
+protected:
     // DiffuseAreaLight Protected Data
     const Spectrum Lemit;
     std::shared_ptr<Shape> shape;
@@ -78,8 +83,8 @@ class DiffuseAreaLight : public AreaLight {
 };
 
 std::shared_ptr<AreaLight> CreateDiffuseAreaLight(
-    const Transform &light2world, const Medium *medium,
-    const ParamSet &paramSet, const std::shared_ptr<Shape> &shape);
+        const Transform &light2world, const Medium *medium,
+        const ParamSet &paramSet, const std::shared_ptr<Shape> &shape);
 
 }  // namespace pbrt
 

@@ -109,7 +109,7 @@ public:
         return (1 - FrDielectric(CosTheta(w), 1, eta)) / (c * Pi);
     }
 
-    Spectrum Sp(const SurfaceInteraction &pi) const {
+    virtual Spectrum Sp(const SurfaceInteraction &pi) const {
         return Sr(Distance(po.p, pi.p));
     }
 

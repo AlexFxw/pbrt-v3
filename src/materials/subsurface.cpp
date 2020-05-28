@@ -42,6 +42,7 @@
 #include "subsurface/normal_diffusion.h"
 #include "subsurface/twopass_dipole.h"
 #include "subsurface/classical_dipole.h"
+#include "subsurface/directional_dipole.h"
 
 namespace pbrt {
 
@@ -103,16 +104,18 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
     } else if (method == SSS_METHOD::DEFAULT) {
         si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
                                                          sig_a, sig_s, table);
-    } else if(method == SSS_METHOD::TWO_PASS) {
-        si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, twopassHelper);
-    } else if(method == SSS_METHOD::CLASSIC) {
+    } else if (method == SSS_METHOD::TWO_PASS) {
+        si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g, twopassHelper);
+    } else if (method == SSS_METHOD::CLASSIC) {
         si->bssrdf = ARENA_ALLOC(arena, ClassicalBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g);
+    } else if (method == SSS_METHOD::DIRECTIONAL) {
+        si->bssrdf = ARENA_ALLOC(arena, DirectionalBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g);
     }
 }
 
 void SubsurfaceMaterial::PrepareMaterial(const std::vector<std::shared_ptr<Shape>> &shapes, const ParamSet &params) {
     Material::PrepareMaterial(shapes, params);
-    if(method == SSS_METHOD::TWO_PASS) {
+    if (method == SSS_METHOD::TWO_PASS) {
         twopassHelper = std::make_shared<TwoPassHelper>();
         twopassHelper->Prepare(shapes);
     }
@@ -161,8 +164,10 @@ SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
         sss_method = SSS_METHOD::NORMAL_DIFFUSION;
     } else if (method == "two_pass") {
         sss_method = SSS_METHOD::TWO_PASS;
-    } else if(method == "classic") {
+    } else if (method == "classic") {
         sss_method = SSS_METHOD::CLASSIC;
+    } else if (method == "direction") {
+        sss_method = SSS_METHOD::DIRECTIONAL;
     }
     return new SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,
                                   roughu, roughv, bumpMap, remapRoughness, scatterDistance, sss_method);
