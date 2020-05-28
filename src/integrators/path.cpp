@@ -200,7 +200,8 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                     Spectrum S = isect.bssrdf->Sample_S(
                             scene, sampler.Get1D(), sampler.Get2D(), arena, &pi, &pdf);
                     if (S.IsBlack() || pdf == 0) break;
-                    beta *= S / pdf;
+                    // beta *= S / pdf;
+                    beta *= S;
                     L += beta; // No need to uniformsample one light because the irradiance stored it already.
                     specularBounce = (flags & BSDF_SPECULAR) != 0;
                 }
@@ -239,11 +240,14 @@ Spectrum PathIntegrator::Irradiance(const Scene &scene, const Point3f &p, const 
         Float theta = std::asin(std::sqrt((j - Xj) * nInv));
         for (int k = 1; k <= 2 * n; k++) {
             Float Yk = sampler.Get1D();
-            Float phi = Pi * (k - Yk) * nInv;
+            Float phi = Pi * ((Float)k - Yk) * nInv;
             Vector3f d = refN * std::cos(theta) + ss * std::sin(theta) * std::cos(phi) +
                          ts * std::sin(theta) * std::sin(phi);
-            RayDifferential ray(p, d);
-            E += Li(ray, scene, sampler, arena, 0);
+            RayDifferential ray(p, Normalize(d));
+            Float dp = Dot(d, refN);
+            if(dp > 0) {
+                E += Li(ray, scene, sampler, arena, 0) * dp; // How many depth should I track?
+            }
         }
     }
     E *= Pi / (Float) (2 * n2);

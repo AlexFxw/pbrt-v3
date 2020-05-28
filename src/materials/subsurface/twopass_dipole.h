@@ -31,7 +31,7 @@ private:
     std::vector<Interaction> sampledP;
     std::vector<int> indices;
     int triangleSum, areaSum;
-    const int nSamples = 1000;
+    const int nSamples = 5000;
     const static int irrSamples = 16;
     bool octreeBuilt;
     std::mutex buildLock;
@@ -56,7 +56,6 @@ public:
     std::shared_ptr<TwoPassHelper> twoPassHelper;
 
     Spectrum Mo(const Point3f &pi, const Spectrum &influxI) const {
-        // Though call influx, it should be already multiplied by the area here.
         Spectrum rSqr = Spectrum((pi - po.p).LengthSquared());
 
         // Distance to real source

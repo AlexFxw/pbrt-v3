@@ -10,13 +10,15 @@ Spectrum IrradianceOctree::Search(const Point3f &p, const std::shared_ptr<Octree
     Float approxSolidAngle = node->avgData.area / (p - node->avgData.pos).LengthSquared();
     if (!contained && approxSolidAngle < solidAngleThreshold) {
         // return bssrdf->Mo(p, node->avgData.E) * node->avgData.area;
+        return bssrdf->Mo(node->avgData.pos, node->avgData.E) * node->avgData.area;
         // Abandom the region too far away.
-        return Spectrum(0.0f);
+        // return Spectrum(0.0f);
     } else {
         Spectrum E(0.0f);
         if (node->IsLeaf()) {
             for (auto &rNode: node->relatedNodes) {
-                E += bssrdf->Mo(p, rNode.E) * rNode.area;
+                // E += bssrdf->Mo(p, rNode.E) * rNode.area;
+                E += bssrdf->Mo(rNode.pos, rNode.E) * rNode.area;
             }
         } else {
             // Inner node.

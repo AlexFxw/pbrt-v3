@@ -100,7 +100,7 @@ public:
               material(material),
               mode(mode) {}
 
-    Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) {
+    virtual Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) {
         ProfilePhase pp(Prof::BSSRDFEvaluation);
         Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
         return (1 - Ft) * Sp(pi) * Sw(wi);
@@ -115,7 +115,7 @@ public:
         return Sr(Distance(po.p, pi.p));
     }
 
-    Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
+    virtual Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
                       MemoryArena &arena, SurfaceInteraction *si,
                       Float *pdf) const;
     Spectrum Sample_Sp(const Scene &scene, Float u1, const Point2f &u2,

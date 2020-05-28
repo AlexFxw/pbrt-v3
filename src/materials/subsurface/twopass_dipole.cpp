@@ -23,7 +23,6 @@ int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, const P
     }
     std::cout << "Preparing Octree" << std::endl;
     std::vector<IrradianceData> data;
-    Float irrSamplesInv = 1.0f / (Float) irrSamples;
     Float sa = areaSum / (Float) nSamples;
 #ifdef VISUALIZE_OCTREE
     const std::string octreeData = "../data/octree.txt";
