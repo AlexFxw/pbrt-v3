@@ -100,7 +100,7 @@ public:
               material(material),
               mode(mode) {}
 
-    virtual Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) {
+    Spectrum S(const SurfaceInteraction &pi, const Vector3f &wi) {
         ProfilePhase pp(Prof::BSSRDFEvaluation);
         Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
         return (1 - Ft) * Sp(pi) * Sw(wi);

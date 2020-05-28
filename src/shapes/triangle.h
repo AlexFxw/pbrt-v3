@@ -72,7 +72,7 @@ struct TriangleMesh {
     PolyStorage *poly = nullptr;
     std::vector<int> faceIndices;
     Distribution1D *areaDistri = nullptr;
-    Float area = 0.0f, invArea = 0.0f;
+    double area = 0.0f, invArea = 0.0f;
 
     inline bool HasPolyCoeffs() const { return poly != nullptr; }
 

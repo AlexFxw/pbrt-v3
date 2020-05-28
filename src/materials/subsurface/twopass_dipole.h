@@ -21,7 +21,7 @@ public:
     int PrepareOctree(const Scene &scene, MemoryArena &arena, const PathIntegrator *integrator);
     int Prepare(const std::vector<std::shared_ptr<Shape>> &shapes);
 
-    Spectrum E(const Point3f &p, const TwoPassBSSRDF * bssrdf);
+    Spectrum E(const Point3f &p, const TwoPassBSSRDF *bssrdf);
 
     bool Prepared() const { return octreeBuilt; }
 
@@ -30,11 +30,11 @@ private:
     std::unique_ptr<IrradianceOctree> octree = nullptr;
     std::vector<Interaction> sampledP;
     std::vector<int> indices;
-    int triangleSum, areaSum;
-    const int nSamples = 5000;
-    const static int irrSamples = 16;
+    int triangleSum;
+    double areaSum;
+    const int nSamples = 100000;
+    const static int irrSamples = 4;
     bool octreeBuilt;
-    std::mutex buildLock;
 };
 
 class TwoPassBSSRDF : public ClassicalBSSRDF {
@@ -43,7 +43,12 @@ public:
                   TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS,
                   Float g, std::shared_ptr<TwoPassHelper> twoPassHelper);
 
-    Spectrum Sp(const SurfaceInteraction &pi) const override;
+    // Spectrum Sp(const SurfaceInteraction &pi) const override;
+
+    // FIXME: It looks like just use Sample_S is OK?
+    Spectrum Sample_S(const Scene &scene, Float u1, const Point2f &u2,
+                      MemoryArena &arena, SurfaceInteraction *si,
+                      Float *pdf) const override;
 
     bool UseCacheCloud() const override { return true; }
 
@@ -71,7 +76,8 @@ public:
                        (C1 * (Exp(-mSigmaTr * dr)) / (dr * dr)
                         + C2 * (Exp(-mSigmaTr * dv)) / (dv * dv));
 
-        return dMo * influxI;
+        Float Fdt = 1.0f - FresnelDiffuseReflectance(eta);
+        return Fdt * dMo * influxI;
     }
 };
 

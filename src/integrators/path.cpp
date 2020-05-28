@@ -163,10 +163,6 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (isect.bssrdf && (flags & BSDF_TRANSMISSION)) {
             // Importance sample the BSSRDF
             SurfaceInteraction pi;
-            // if(isect.bssrdf->UseCacheCloud() && !isect.bssrdf->Prepared()) {
-            //     TwoPassBSSRDF *twopass = (TwoPassBSSRDF*)isect.bssrdf;
-            //     twopass->twoPassHelper->PrepareOctree(scene, arena, isect.bsdf);
-            // }
 
             if (!isect.bssrdf->UseCacheCloud()) {
                 Spectrum S = isect.bssrdf->Sample_S(

@@ -149,7 +149,7 @@ private:
     std::shared_ptr<OctreeNode> root;
     int nSamples;
     Bounds3f aabb;
-    static constexpr Float solidAngleThreshold = 0.01f;
+    static constexpr Float solidAngleThreshold = 0.1f;
 };
 
 

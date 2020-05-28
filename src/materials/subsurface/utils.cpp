@@ -8,10 +8,10 @@ namespace pbrt {
 std::shared_ptr<TriangleMesh> Utils::PreprocessTriangles(const std::vector<std::shared_ptr<Shape>> &shapes) {
     // "shapes" is the collection of triangles.
     // Initialize triangle mesh's area distribution here.
-    Float areaSum = 0.0f;
+    double areaSum = 0.0f;
     size_t shapesNum = shapes.size();
     DCHECK_GT(shapesNum, 0);
-    Float areas[shapesNum];
+    Float *areas = new Float[shapesNum];
     for (size_t i = 0; i < shapesNum; i++) {
         areas[i] = shapes[i]->Area();
         areaSum += areas[i];
@@ -22,6 +22,7 @@ std::shared_ptr<TriangleMesh> Utils::PreprocessTriangles(const std::vector<std::
     triMesh->areaDistri = new Distribution1D(areas, shapesNum);
     triMesh->area = areaSum;
     triMesh->invArea = 1.0f / areaSum;
+    delete [] areas;
     return triMesh;
 }
 

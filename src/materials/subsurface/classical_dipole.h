@@ -15,6 +15,7 @@ public:
     Float Sample_Sr(int ch, Float u) const override;
     Float Pdf_Sr(int ch, Float r) const override;
 
+    static Float FresnelDiffuseReflectance(Float eta);
 protected:
     Spectrum mZv, mZr;
     Spectrum mSigmaTr;

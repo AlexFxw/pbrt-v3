@@ -42,8 +42,8 @@ void IrradianceOctree::Propagate(const std::shared_ptr<OctreeNode> &node) {
         for (IrradianceData &sample: node->relatedNodes) {
             clusterData.E += sample.E * sample.area;
             clusterData.area += sample.area;
-            // FIXME: Use luminance?
-            Float weight = sample.E.y() * sample.area;
+            // Float weight = sample.E.y() * sample.area;
+            Float weight = sample.area;
             clusterData.pos += sample.pos * weight;
             weightSum += weight;
         }
@@ -55,7 +55,8 @@ void IrradianceOctree::Propagate(const std::shared_ptr<OctreeNode> &node) {
                 IrradianceData &childAvg = node->children[i]->avgData;
                 clusterData.E += childAvg.E * childAvg.area;
                 clusterData.area += childAvg.area;
-                Float weight = childAvg.E.y() * childAvg.area;
+                // Float weight = childAvg.E.y() * childAvg.area;
+                Float weight = childAvg.area;
                 clusterData.pos += childAvg.pos * weight;
                 weightSum += weight;
             }

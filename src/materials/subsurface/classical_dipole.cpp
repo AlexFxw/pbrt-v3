@@ -3,7 +3,7 @@
 
 namespace pbrt {
 
-Float FresnelDiffuseReflectance(Float eta) {
+Float ClassicalBSSRDF::FresnelDiffuseReflectance(Float eta) {
     /* Fast mode: the following code approximates the
      * diffuse Frensel reflectance for the eta<1 and
      * eta>1 cases. An evalution of the accuracy led

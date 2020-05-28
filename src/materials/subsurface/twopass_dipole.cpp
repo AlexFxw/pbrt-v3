@@ -17,7 +17,6 @@
 namespace pbrt {
 
 int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, const PathIntegrator *intergrater) {
-    std::lock_guard<std::mutex> lockGuard(buildLock);
     if (octreeBuilt) {
         return 0;
     }
@@ -60,6 +59,7 @@ int TwoPassHelper::Prepare(const std::vector<std::shared_ptr<Shape>> &shapes) {
     DCHECK_EQ(triMesh->nTriangles, shapes.size());
     areaSum = triMesh->area;
     triangleSum = triMesh->nTriangles;
+    std::cout << "Area: " << areaSum << " " << triangleSum << std::endl;
 
     for (int i = 0; i < nSamples; i++) {
         Float pdf;
@@ -75,10 +75,10 @@ Spectrum TwoPassHelper::E(const Point3f &p, const TwoPassBSSRDF *bssrdf) {
     return E;
 }
 
-Spectrum TwoPassBSSRDF::Sp(const SurfaceInteraction &pi) const {
-    Spectrum E = twoPassHelper->E(pi.p, this);
-    return E;
-}
+// Spectrum TwoPassBSSRDF::Sp(const SurfaceInteraction &pi) const {
+//     Spectrum E = twoPassHelper->E(pi.p, this);
+//     return E;
+// }
 
 TwoPassBSSRDF::TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
                              TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS, Float g,
@@ -86,6 +86,18 @@ TwoPassBSSRDF::TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Mate
         ClassicalBSSRDF(po, eta, material, mode, sigmaA, sigmaS, g),
         twoPassHelper(twoPassHelper) {
 
+}
+
+Spectrum
+TwoPassBSSRDF::Sample_S(const Scene &scene, Float u1, const Point2f &u2, MemoryArena &arena, SurfaceInteraction *si,
+                        Float *pdf) const {
+
+    Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
+    Spectrum E = twoPassHelper->E(po.p, this);
+    Float Fdr = FresnelDiffuseReflectance(eta);
+    *pdf = 1.0f;
+    // return ((1 - Ft) / Fdr) * (E / Pi);
+    return (1 - Ft) * E * InvPi;
 }
 
 } // namespace pbrt
