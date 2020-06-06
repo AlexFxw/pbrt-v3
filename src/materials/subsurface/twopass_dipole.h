@@ -10,6 +10,8 @@
 #include "octree.h"
 #include "classical_dipole.h"
 #include <mutex>
+#include "medium.h"
+
 
 namespace pbrt {
 
@@ -41,7 +43,7 @@ class TwoPassBSSRDF : public ClassicalBSSRDF {
 public:
     TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
                   TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS,
-                  Float g, std::shared_ptr<TwoPassHelper> twoPassHelper);
+                  Float g, std::shared_ptr<TwoPassHelper> twoPassHelper, const Spectrum &R);
 
     // Spectrum Sp(const SurfaceInteraction &pi) const override;
 
@@ -79,6 +81,9 @@ public:
         Float Fdt = 1.0f - FresnelDiffuseReflectance(eta);
         return Fdt * dMo * influxI;
     }
+
+private:
+    Spectrum R;
 };
 
 class TwoPassBSSRDFAdapter : public BxDF {

@@ -134,6 +134,8 @@ public:
         root->Build(0, samplePoints, aabb);
         Propagate(root);
         std::cout << root->avgData.area;
+        // solidAngleThreshold = 0.1f * root->avgData.area / (aabb.Diagonal()).LengthSquared();
+        solidAngleThreshold = 0.1f;
     }
 
     Spectrum Search(const Point3f &p, const TwoPassBSSRDF *bssrdf) {
@@ -149,7 +151,7 @@ private:
     std::shared_ptr<OctreeNode> root;
     int nSamples;
     Bounds3f aabb;
-    static constexpr Float solidAngleThreshold = 0.1f;
+    static Float solidAngleThreshold;
 };
 
 

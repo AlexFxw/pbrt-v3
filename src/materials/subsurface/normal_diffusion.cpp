@@ -26,7 +26,6 @@ Float NormalDiffusion::Pdf_Sr(int ch, Float r) const {
 }
 
 Float NormalDiffusion::Sample_Sr(int ch, Float u) const {
-    // TODO: Understand why.
     if (u < firstTermRatio) {
         // Sample the first exponential term
         u = std::min<Float>(u * 4, OneMinusEpsilon);
@@ -38,7 +37,6 @@ Float NormalDiffusion::Sample_Sr(int ch, Float u) const {
 }
 
 Spectrum NormalDiffusion::Sr(Float r) const {
-    // FIXME: Use R or not?
     ProfilePhase pp(Prof::BSSRDFEvaluation);
     r = SmallRFilter(r);
     Spectrum spectrumR = -Spectrum(r);

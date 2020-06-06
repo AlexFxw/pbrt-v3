@@ -58,7 +58,7 @@ class PathIntegrator : public SamplerIntegrator {
     Spectrum Li(const RayDifferential &ray, const Scene &scene,
                 Sampler &sampler, MemoryArena &arena, int depth) const;
 
-    static void AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper);
+    static void AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper, Material *material);
 
     Spectrum Irradiance(const Scene &scene, const Point3f &p, const Vector3f &refN,
                         Sampler &sampler, MemoryArena &arena, int n) const;
@@ -69,6 +69,7 @@ class PathIntegrator : public SamplerIntegrator {
     const std::string lightSampleStrategy;
     std::unique_ptr<LightDistribution> lightDistribution;
     static std::shared_ptr<TwoPassHelper> helper;
+    static Material *twopassMaterial;
 };
 
 PathIntegrator *CreatePathIntegrator(const ParamSet &params,

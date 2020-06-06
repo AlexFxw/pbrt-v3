@@ -101,12 +101,15 @@ void SubsurfaceMaterial::ComputeScatteringFunctions(
     Spectrum sig_s = scale * sigma_s->Evaluate(*si).Clamp();
     if (method == SSS_METHOD::NORMAL_DIFFUSION) {
         Spectrum d = scatterDistance->Evaluate(*si);
+        // Spectrum sigma_s_pr = sig_s * (1 - g), sigma_t_pr = sigma_s_pr + sig_a;
+        // Spectrum sigma_tr = Sqrt(3 * (Spectrum(1.0f) - R)) * sigma_t_pr;
+        // Spectrum d = Spectrum(1.0f) / sigma_tr;
         si->bssrdf = ARENA_ALLOC(arena, NormalDiffusion)(R, d, *si, eta, this, mode);
     } else if (method == SSS_METHOD::DEFAULT) {
         si->bssrdf = ARENA_ALLOC(arena, TabulatedBSSRDF)(*si, this, mode, eta,
                                                          sig_a, sig_s, table);
     } else if (method == SSS_METHOD::TWO_PASS) {
-        si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g, twopassHelper);
+        si->bssrdf = ARENA_ALLOC(arena, TwoPassBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g, twopassHelper, R);
     } else if (method == SSS_METHOD::CLASSIC) {
         si->bssrdf = ARENA_ALLOC(arena, ClassicalBSSRDF)(*si, eta, this, mode, sig_a, sig_s, g);
     } else if (method == SSS_METHOD::DIRECTIONAL) {
@@ -119,7 +122,7 @@ void SubsurfaceMaterial::PrepareMaterial(const std::vector<std::shared_ptr<Shape
     if (method == SSS_METHOD::TWO_PASS) {
         twopassHelper = std::make_shared<TwoPassHelper>();
         twopassHelper->Prepare(shapes);
-        PathIntegrator::AddHelper(twopassHelper);
+        PathIntegrator::AddHelper(twopassHelper, this);
     }
 }
 
@@ -163,12 +166,16 @@ SubsurfaceMaterial *CreateSubsurfaceMaterial(const TextureParams &mp) {
     const std::string method = mp.FindString("method", "default");
     SSS_METHOD sss_method = SSS_METHOD::DEFAULT;
     if (method == "normal_diffuse") {
+        std::cout << "Normal diffusion" << std::endl;
         sss_method = SSS_METHOD::NORMAL_DIFFUSION;
     } else if (method == "two_pass") {
+        std::cout << "Two pass cache" << std::endl;
         sss_method = SSS_METHOD::TWO_PASS;
     } else if (method == "classic") {
+        std::cout << "Standard dipole" << std::endl;
         sss_method = SSS_METHOD::CLASSIC;
     } else if (method == "direction") {
+        std::cout << "Directional dipole" << std::endl;
         sss_method = SSS_METHOD::DIRECTIONAL;
     }
     return new SubsurfaceMaterial(scale, Kr, Kt, sigma_a, sigma_s, g, eta,

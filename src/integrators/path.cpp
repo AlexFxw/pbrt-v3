@@ -31,6 +31,8 @@
  */
 
 // integrators/path.cpp*
+#include <core/interaction.h>
+#include <materials/subsurface.h>
 #include "integrators/path.h"
 #include "bssrdf.h"
 #include "camera.h"
@@ -47,6 +49,7 @@ STAT_PERCENT("Integrator/Zero-radiance paths", zeroRadiancePaths, totalPaths);
 STAT_INT_DISTRIBUTION("Integrator/Path length", pathLength);
 
 std::shared_ptr<TwoPassHelper> PathIntegrator::helper;
+Material *PathIntegrator::twopassMaterial;
 
 // PathIntegrator Method Definitions
 PathIntegrator::PathIntegrator(int maxDepth,
@@ -178,7 +181,6 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 Spectrum f = pi.bsdf->Sample_f(pi.wo, &wi, sampler.Get2D(), &pdf,
                                                BSDF_ALL, &flags);
                 if (f.IsBlack() || pdf == 0) break;
-
                 beta *= f * AbsDot(wi, pi.shading.n) / pdf;
 
                 DCHECK(!std::isinf(beta.y()));
@@ -218,9 +220,11 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     return L;
 }
 
-void PathIntegrator::AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper) {
+void PathIntegrator::AddHelper(const std::shared_ptr<TwoPassHelper> &twoPassHelper,
+                               Material *material) {
     // FIXME: Only support one helper in a scene yet.
     helper = std::shared_ptr<TwoPassHelper>(twoPassHelper);
+    twopassMaterial = material;
 }
 
 Spectrum PathIntegrator::Irradiance(const Scene &scene, const Point3f &p, const Vector3f &refN,
@@ -236,12 +240,17 @@ Spectrum PathIntegrator::Irradiance(const Scene &scene, const Point3f &p, const 
         Float theta = std::asin(std::sqrt((j - Xj) * nInv));
         for (int k = 1; k <= 2 * n; k++) {
             Float Yk = sampler.Get1D();
-            Float phi = Pi * ((Float)k - Yk) * nInv;
+            Float phi = Pi * ((Float) k - Yk) * nInv;
             Vector3f d = refN * std::cos(theta) + ss * std::sin(theta) * std::cos(phi) +
                          ts * std::sin(theta) * std::sin(phi);
             RayDifferential ray(p, Normalize(d));
             Float dp = Dot(d, refN);
-            if(dp > 0) {
+
+            for (const auto &light : scene.infiniteLights) {
+                E += light->Le(ray);
+            }
+
+            if (dp > 0) {
                 E += Li(ray, scene, sampler, arena, 0) * dp; // How many depth should I track?
             }
         }

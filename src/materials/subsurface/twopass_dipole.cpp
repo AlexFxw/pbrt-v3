@@ -16,6 +16,7 @@
 
 namespace pbrt {
 
+
 int TwoPassHelper::PrepareOctree(const Scene &scene, MemoryArena &arena, const PathIntegrator *intergrater) {
     if (octreeBuilt) {
         return 0;
@@ -82,9 +83,10 @@ Spectrum TwoPassHelper::E(const Point3f &p, const TwoPassBSSRDF *bssrdf) {
 
 TwoPassBSSRDF::TwoPassBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material,
                              TransportMode mode, const Spectrum &sigmaA, const Spectrum &sigmaS, Float g,
-                             std::shared_ptr<TwoPassHelper> twoPassHelper) :
+                             std::shared_ptr<TwoPassHelper> twoPassHelper, const Spectrum &R) :
         ClassicalBSSRDF(po, eta, material, mode, sigmaA, sigmaS, g),
-        twoPassHelper(twoPassHelper) {
+        twoPassHelper(twoPassHelper),
+        R(R) {
 
 }
 
@@ -95,7 +97,6 @@ TwoPassBSSRDF::Sample_S(const Scene &scene, Float u1, const Point2f &u2, MemoryA
     Float Ft = FrDielectric(CosTheta(po.wo), 1, eta);
     Spectrum E = twoPassHelper->E(po.p, this);
     Float Fdr = FresnelDiffuseReflectance(eta);
-    *pdf = 1.0f;
     // return ((1 - Ft) / Fdr) * (E / Pi);
     return (1 - Ft) * E * InvPi;
 }

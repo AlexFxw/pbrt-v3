@@ -10,7 +10,6 @@ namespace pbrt {
 
 void VAESubsurface::ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                                bool allowMultipleLobes) const {
-    // TODO
     // Use the BSDF of subsurface material, but replace the bssrdf with vae scattering function implementation.
     SubsurfaceMaterial::ComputeScatteringFunctions(si, arena, mode, allowMultipleLobes);
     si->bssrdf = ARENA_ALLOC(arena, VaeScatter)(*si, this->eta, this->mVaeHandler, mode);
@@ -24,7 +23,7 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
             sig_s = Spectrum::FromRGB(sig_s_rgb);
     std::string name = mp.FindString("name");
     bool found = GetMediumScatteringProperties(name, &sig_a, &sig_s);
-    Float g = mp.FindFloat("g", 0.1f);
+    Float g = mp.FindFloat("g", 0.f);
     Float kernelEpsScale = mp.FindFloat("kernelEpsScale", 1.0f);
     if (name != "") {
         if (!found)
@@ -55,8 +54,9 @@ VAESubsurface *CreateVaeSubsurfaceMaterial(const TextureParams &mp) {
                                                      roughu, roughv, bumpMap, remapRoughness);
     // FIXME: Configure sigmaT, albedo, etc better
     Float rgb[3] = {52.02, 78.54, 109.12};
-    Spectrum sigmaT = Spectrum::FromRGB(rgb);
-    Spectrum albedo(0.99f);
+    // Spectrum sigmaT = Spectrum::FromRGB(rgb);
+    Spectrum sigmaT = sig_a + sig_s;
+    Spectrum albedo(0.99f); // Configure albedo.
 
     std::string modelName = mp.FindString("model_name", "0487_FinalSharedLs7Mixed3_AbsSharedSimComplexMixed3");
     std::string absModelName = modelName;

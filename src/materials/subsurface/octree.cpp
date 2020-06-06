@@ -3,6 +3,8 @@
 
 namespace pbrt {
 
+Float IrradianceOctree::solidAngleThreshold = 0.1f;
+
 Spectrum IrradianceOctree::Search(const Point3f &p, const std::shared_ptr<OctreeNode> &node, const Bounds3f &aabb,
                                   const TwoPassBSSRDF *bssrdf) {
     // FIXME: Bugs must be here!

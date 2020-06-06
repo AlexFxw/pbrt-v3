@@ -48,7 +48,7 @@ Float ClassicalBSSRDF::FresnelDiffuseReflectance(Float eta) {
 
 ClassicalBSSRDF::ClassicalBSSRDF(const SurfaceInteraction &po, Float eta, const Material *material, TransportMode mode,
                                  const Spectrum &sigmaA, const Spectrum &sigmaS, Float g) :
-        SeparableBSSRDF(po, eta, material, mode), mSigmaA(sigmaA), mSigmaS(sigmaS), g(g) {
+        SeparableBSSRDF(po, eta, material, mode), mSigmaA(sigmaA), mSigmaS(sigmaS), g(g), phaseFunc(HenyeyGreenstein(0.7)) {
     mSigmaSPrime = mSigmaS * (1.0f - g);
     mSigmaTPrime = mSigmaSPrime + mSigmaA;
     Spectrum meanFreePath = Spectrum(1.0f) / mSigmaTPrime;

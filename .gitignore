@@ -15,3 +15,4 @@ src/ext/tensorflow
 scenes/
 data
 render.sh
+logs
